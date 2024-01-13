@@ -31,8 +31,8 @@ def generate_launch_description() -> LaunchDescription:
                      Command([
                          ExecutableInPackage("xacro", "xacro"), " ",
                          PathJoinSubstitution(
-                            #  [FindPackageShare('turtle_brick'), "turtle.urdf.xacro"]
-                             "../urdf/turtlebot3_burger.urdf.xacro"
+                             [FindPackageShare('nuturtle_description'), "urdf/turtlebot3_burger.urdf.xacro"]
+                            #  "../urdf/turtlebot3_burger.urdf.xacro"
                              )
                      ])
              }]),
@@ -49,10 +49,10 @@ def generate_launch_description() -> LaunchDescription:
              executable='rviz2',
              arguments=[[
                  "-d",
-                 "../config/basic_purple.rviz"
-                #  PathJoinSubstitution(
-                #      [FindPackageShare('turtle_brick'),LaunchConfiguration("rivz_config")]
-                #     )
+                #  "../config/basic_purple.rviz"
+                 PathJoinSubstitution(
+                     [FindPackageShare('nuturtle_description') , "config/basic_purple.rviz"]
+                    )
              ]],
              condition=IfCondition(EqualsSubstitution(LaunchConfiguration("use_rviz"), 'true')),
              ),

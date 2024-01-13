@@ -16,7 +16,7 @@
     <visual>
       <origin xyz="-0.032 0 0.0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="${find nuturtle_description)/mesh/burger_base.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file://$(find nuturtle_description)/mesh/burger_base.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="light_black"/>
     </visual>
@@ -46,7 +46,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="1.57 0 0"/>
       <geometry>
-        <mesh filename="${find nuturtle_description)/mesh/left_tire.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file://$(find nuturtle_description)/mesh/left_tire.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="dark"/>
     </visual>
@@ -76,7 +76,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="1.57 0 0"/>
       <geometry>
-        <mesh filename="${find nuturtle_description)/mesh/right_tire.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file://$(find nuturtle_description)/mesh/right_tire.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="dark"/>
     </visual>
@@ -134,7 +134,7 @@
     <visual>
       <origin xyz="0 0 0.0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="${find nuturtle_description)/mesh/lds.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file://$(find nuturtle_description)/mesh/lds.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="dark"/>
     </visual>
