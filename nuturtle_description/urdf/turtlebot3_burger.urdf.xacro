@@ -1,4 +1,12 @@
 <?xml version="1.0" ?>
+
+<!-- This file was from 
+https://github.com/ROBOTIS-GIT/turtlebot3/blob/humble-devel/turtlebot3_description/urdf/turtlebot3_burger.urdf
+With modification of:
+* stl file path to this project 
+* color selection of body link
+* parameters of collision geometry with config file
+-->
 <robot name="turtlebot3_burger"
   xmlns:xacro="http://ros.org/wiki/xacro">
   <xacro:include filename="$(find nuturtle_description)/urdf/common_properties.urdf"/>

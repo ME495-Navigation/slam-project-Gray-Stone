@@ -7,7 +7,7 @@ This repository consists of several ROS packages
 
 
 
-## nuturtle_description
+## Package: nuturtle_description
 
 A custom turtlebot description package. Contains the launch file and urdfs for turtlebot with custom modification. 
 
@@ -23,3 +23,20 @@ URDF also reads in the `config/diff_params.yaml` file for configuration on it.
 ### Launch file
 
 `load_one.launch.py` launches one turtlebot with it's urdf.
+
+arguments: 
+```
+Arguments (pass arguments as '<name>:=<value>'):
+
+    'use_jsp':
+        select weather joint state publisher should be used, true or false. default true
+        (default: 'true')
+
+    'use_rviz':
+        select weather to use rviz, true or false. default true
+        (default: 'true')
+
+    'color':
+        select the color of the turtlebot. Valid choices are: ['red', 'green', 'blue', 'purple']
+        (default: 'purple')
+```

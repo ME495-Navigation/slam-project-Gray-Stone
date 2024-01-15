@@ -1,11 +1,12 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions.declare_launch_argument import DeclareLaunchArgument
+from launch.actions.set_launch_configuration import SetLaunchConfiguration, SomeSubstitutionsType
 from launch.substitutions.command import Command
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.substitutions import ExecutableInPackage
 from launch.substitutions.path_join_substitution import PathJoinSubstitution
-from launch.substitutions import EqualsSubstitution
+from launch.substitutions import EqualsSubstitution, TextSubstitution
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 
@@ -23,11 +24,21 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             name="use_rviz",
             default_value="true",
-            description="select weather to use rivz, true or false. default true"),
+            description="select weather to use rviz, true or false. default true"),
         DeclareLaunchArgument(name="color",
                               default_value="purple",
                               choices=["red", "green", "blue", "purple"],
                               description="select the color of the turtlebot."),
+
+        # These are alternative ways of concatenate argument into strings 
+        # if not wanting to use the concatenation in Node's argument parameter.
+        
+        # SetLaunchConfiguration("rviz_file_name",
+        #                        ["basic_", LaunchConfiguration("color"), ".rviz"]),
+        # SetLaunchConfiguration("rviz_base_frame", [
+        #     LaunchConfiguration("color"),
+        #     "/base_frame",
+        # ]),
 
         # Nodes to launch
         Node(package='robot_state_publisher',
@@ -43,8 +54,7 @@ def generate_launch_description() -> LaunchDescription:
                          ]), " ", "color:=",
                          LaunchConfiguration("color")
                      ]),
-                 'frame_prefix':
-                     [LaunchConfiguration("color"),"/"]
+                 'frame_prefix': [LaunchConfiguration("color"), "/"]
              }]),
         Node(package='joint_state_publisher',
              executable="joint_state_publisher",
@@ -54,11 +64,13 @@ def generate_launch_description() -> LaunchDescription:
             package='rviz2',
             namespace=LaunchConfiguration("color"),
             executable='rviz2',
-            arguments=[[
-                "-d",
-                PathJoinSubstitution(
-                    [FindPackageShare('nuturtle_description'), "config/basic_purple.rviz"])
-            ]],
+            arguments=[["-f", LaunchConfiguration("color"), "/base_link"],
+                       [
+                           "-d",
+                           PathJoinSubstitution(
+                               [FindPackageShare('nuturtle_description'), "config/"]), "basic_",
+                           LaunchConfiguration("color"), ".rviz"
+                       ]],
             condition=IfCondition(EqualsSubstitution(LaunchConfiguration("use_rviz"), 'true')),
         ),
     ])
