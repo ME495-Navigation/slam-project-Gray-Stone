@@ -1,0 +1,27 @@
+<launch>
+    <!-- The list of  -->
+    <include file="$(find-pkg-share nuturtle_description)/launch/load_one.launch.py">
+        <arg name="use_rviz" value="False" />
+        <arg name="color" value="purple" />
+    </include>
+    <include file="$(find-pkg-share nuturtle_description)/launch/load_one.launch.py">
+        <arg name="use_rviz" value="False" />
+        <arg name="color" value="red" />
+    </include>
+    <include file="$(find-pkg-share nuturtle_description)/launch/load_one.launch.py">
+        <arg name="use_rviz" value="False" />
+        <arg name="color" value="green" />
+    </include>
+    <include file="$(find-pkg-share nuturtle_description)/launch/load_one.launch.py">
+        <arg name="use_rviz" value="False" />
+        <arg name="color" value="blue" />
+    </include>
+
+    <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share nuturtle_description)/config/basic_all.rviz --fixed-frame nusim/world"/>
+
+    <node pkg="tf2_ros" exec="static_transform_publisher" name="red_static_pub" args="0.3 0 0 0 0 0 nusim/world red/base_footprint"/>
+    <node pkg="tf2_ros" exec="static_transform_publisher" name="green_static_pub" args="0 0.6 0 0 0 0 nusim/world green/base_footprint"/>
+    <node pkg="tf2_ros" exec="static_transform_publisher" name="blue_static_pub" args="-0.71 0 0 0 0 0 nusim/world blue/base_footprint"/>
+    <node pkg="tf2_ros" exec="static_transform_publisher" name="purple_static_pub" args="0 -0.9 0 0 0 0 nusim/world purple/base_footprint"/>
+
+</launch>

@@ -2,7 +2,7 @@
 
 <!-- This file was from 
 https://github.com/ROBOTIS-GIT/turtlebot3/blob/humble-devel/turtlebot3_description/urdf/turtlebot3_burger.urdf
-With modification of:
+With modification of
 * stl file path to this project 
 * color selection of body link
 * parameters of collision geometry with config file
