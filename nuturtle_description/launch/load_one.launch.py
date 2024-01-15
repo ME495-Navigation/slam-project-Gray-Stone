@@ -13,48 +13,52 @@ from launch.substitutions import LaunchConfiguration
 def generate_launch_description() -> LaunchDescription:
 
     return LaunchDescription([
-        
+
         # Arguments
         DeclareLaunchArgument(
             name="use_jsp",
             default_value="true",
-            description="select weather joint state publisher should be used, true or false. default true"),
-        DeclareLaunchArgument(name="use_rviz",
-                              default_value="true",
-                              description="select weather to use rivz, true or false. default true"),
+            description=
+            "select weather joint state publisher should be used, true or false. default true"),
+        DeclareLaunchArgument(
+            name="use_rviz",
+            default_value="true",
+            description="select weather to use rivz, true or false. default true"),
+        DeclareLaunchArgument(name="color",
+                              default_value="purple",
+                              choices=["red", "green", "blue", "purple"],
+                              description="select the color of the turtlebot."),
 
-
+        # Nodes to launch
         Node(package='robot_state_publisher',
              executable='robot_state_publisher',
+             namespace=LaunchConfiguration("color"),
              parameters=[{
                  'robot_description':
                      Command([
                          ExecutableInPackage("xacro", "xacro"), " ",
-                         PathJoinSubstitution(
-                             [FindPackageShare('nuturtle_description'), "urdf/turtlebot3_burger.urdf.xacro"]
-                            #  "../urdf/turtlebot3_burger.urdf.xacro"
-                             )
-                     ])
+                         PathJoinSubstitution([
+                             FindPackageShare('nuturtle_description'),
+                             "urdf/turtlebot3_burger.urdf.xacro"
+                         ]), " ", "color:=",
+                         LaunchConfiguration("color")
+                     ]),
+                 'frame_prefix':
+                     [LaunchConfiguration("color"),"/"]
              }]),
-
-
-        # Node(package='joint_state_publisher_gui',
-        #      executable="joint_state_publisher_gui",
-        #      condition=IfCondition(EqualsSubstitution(LaunchConfiguration("use_jsp"), 'gui'))),
         Node(package='joint_state_publisher',
              executable="joint_state_publisher",
+             namespace=LaunchConfiguration("color"),
              condition=IfCondition(EqualsSubstitution(LaunchConfiguration("use_jsp"), 'true'))),
         Node(
             package='rviz2',
-             executable='rviz2',
-             arguments=[[
-                 "-d",
-                #  "../config/basic_purple.rviz"
-                 PathJoinSubstitution(
-                     [FindPackageShare('nuturtle_description') , "config/basic_purple.rviz"]
-                    )
-             ]],
-             condition=IfCondition(EqualsSubstitution(LaunchConfiguration("use_rviz"), 'true')),
-             ),
-
-             ])
+            namespace=LaunchConfiguration("color"),
+            executable='rviz2',
+            arguments=[[
+                "-d",
+                PathJoinSubstitution(
+                    [FindPackageShare('nuturtle_description'), "config/basic_purple.rviz"])
+            ]],
+            condition=IfCondition(EqualsSubstitution(LaunchConfiguration("use_rviz"), 'true')),
+        ),
+    ])

@@ -9,7 +9,9 @@
   <xacro:property name="track_width" value="${ddrive_prop['track_width']}" />
   <xacro:property name="collision_radius" value="${ddrive_prop['collision_radius']}" />
   
-
+  <!-- Possible value red green blue purple -->
+  <xacro:property name="color" value="$(arg color)" />
+  <!-- <xacro:property name="color" value="red" /> -->
 
   <link name="base_footprint"/>
 
@@ -25,7 +27,7 @@
       <geometry>
         <mesh filename="file://$(find nuturtle_description)/mesh/burger_base.stl" scale="0.001 0.001 0.001"/>
       </geometry>
-      <material name="light_black"/>
+      <material name="${color}"/>
     </visual>
 
     <collision>

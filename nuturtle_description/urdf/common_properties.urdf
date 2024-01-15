@@ -1,4 +1,8 @@
 <?xml version="1.0" ?>
+<!-- The origional file is from 
+  https://github.com/ROBOTIS-GIT/turtlebot3/blob/humble-devel/turtlebot3_description/urdf/common_properties.urdf
+And has been modified with addition of an extra color 
+-->
 
 <robot name="xacro_properties" 
   xmlns:xacro="http://ros.org/wiki/xacro">
@@ -42,4 +46,9 @@
   <material name="white">
     <color rgba="1.0 1.0 1.0 1.0"/>
   </material>
+  
+  <material name="purple">
+    <color rgba="0.3 0.16 0.52 1.0"/>
+  </material>
+
 </robot>
