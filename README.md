@@ -7,26 +7,36 @@ This repository consists of several ROS packages
 
 
 
-## Package: nuturtle_description
+# Nuturtle  Description
+URDF files for Nuturtle tube
+* `ros2 launch nuturtle_description load_one.launch.py` to see the robot in rviz.
+* `ros2 launch nuturtle_description load_all.launch.xml` to see four copies of the robot in rviz.
+![rivz when showing all 4 robots](images/rviz.png)
+* The rqt_graph when all four robots are visualized (Nodes Only, Hide Debug) is:
+![rqt_graph when showing all 4 robots](images/rqt_graph.svg)
 
-A custom turtlebot description package. Contains the launch file and urdfs for turtlebot with custom modification. 
 
-* turtle bot collision geometry have some parameters 
-    * when given a positive body radius, body collision geometry is changed to cylinder (with given radius)
+# Launch File Details
+* `ros2 launch nuturtle_description load_all.launch.xml -s`
+    ```
+    Arguments (pass arguments as '<name>:=<value>'):
 
-### URDF options
+        'use_jsp':
+            select weather joint state publisher should be used, true or false. default true
+            (default: 'true')
 
-URDF takes color argument to set the robot color to red, green, blue, or purple.
+        'use_rviz':
+            select weather to use rviz, true or false. default true
+            (default: 'true')
 
-URDF also reads in the `config/diff_params.yaml` file for configuration on it.   
+        'color':
+            select the color of the turtlebot. Valid choices are: ['red', 'green', 'blue', 'purple']
+            (default: 'purple')
+    ```
 
-### Launch file
-
-`load_one.launch.py` launches one turtlebot with it's urdf.
-
-arguments: 
-```
-Arguments (pass arguments as '<name>:=<value>'):
+* `launch nuturtle_description load_one.launch.py -s`
+    ```
+    Arguments (pass arguments as '<name>:=<value>'):
 
     'use_jsp':
         select weather joint state publisher should be used, true or false. default true
@@ -39,4 +49,4 @@ Arguments (pass arguments as '<name>:=<value>'):
     'color':
         select the color of the turtlebot. Valid choices are: ['red', 'green', 'blue', 'purple']
         (default: 'purple')
-```
+    ```
