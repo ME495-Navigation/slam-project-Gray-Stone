@@ -48,7 +48,7 @@ def generate_launch_description() -> LaunchDescription:
             namespace=LaunchConfiguration("color"),
             parameters=[{
                 'robot_description':
-                    ParameterValue(  # ########## Citation [1] ########## #
+                    ParameterValue(  # Citation: ---------- [1] ----------
                         Command([
                             ExecutableInPackage("xacro", "xacro"), " ",
                             PathJoinSubstitution([
