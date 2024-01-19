@@ -1,11 +1,67 @@
 #include "turtlelib/geometry2d.hpp"
+#include <string>
+#include <iostream>
 
+namespace turtlelib
+{
 
-namespace turtlelib{
-    
-    double normalize_angle(double rad){
+    double normalize_angle(double rad)
+    {
         // Citation ---------- [2] ----------
         return rad - (std::ceil((rad + PI) / (2 * PI)) - 1) * 2 * PI;
     }
-    
+    std::ostream &operator<<(std::ostream &os, const Point2D &p)
+    {
+        os << "[" << p.x << " " << p.y << "]";
+        return os;
+    }
+
+    std::istream &operator>>(std::istream &is, Point2D &p)
+    {
+        if (is.peek() == '[')
+        {
+            is.get();
+        }
+        is >> p.x >> p.y;
+
+        if (is.peek() == ']')
+        {
+            is.get();
+        }
+
+        return is;
+    }
+
+    Vector2D operator-(const Point2D &head, const Point2D &tail)
+    {
+        return {head.x - tail.x, head.y - tail.y};
+    }
+
+    Point2D operator+(const Point2D &tail, const Vector2D &disp)
+    {
+        return {tail.x + disp.x, tail.y + disp.y};
+    }
+
+    std::ostream &operator<<(std::ostream &os, const Vector2D &v)
+    {
+        os << "[" << v.x << " " << v.y << "]";
+        return os;
+    }
+
+    std::istream &operator>>(std::istream &is, Vector2D &v)
+    {
+        if (is.peek() == '[')
+        {
+            is.get();
+        }
+        is >> v.x >> v.y;
+
+        if (is.peek() == ']')
+        {
+            is.get();
+        }
+
+        return is;
+    }
+
 }
