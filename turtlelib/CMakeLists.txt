@@ -87,6 +87,8 @@ if(BUILD_TESTING)
     target_link_libraries(test_se2d Catch2::Catch2WithMain turtlelib)
     add_executable(test_svg tests/test_svg.cpp)
     target_link_libraries(test_svg Catch2::Catch2WithMain turtlelib)
+    add_executable(manual_test_se2d_svg tests/manual_test_se2d_svg.cpp)
+    target_link_libraries(manual_test_se2d_svg Catch2::Catch2WithMain turtlelib)
 
     # register the test with CTest, telling it what executable to run
     add_test(NAME geometry2d_test COMMAND test_geometry2d)

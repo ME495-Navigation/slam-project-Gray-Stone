@@ -1,6 +1,7 @@
 
 
 #include "turtlelib/svg.hpp"
+#include <ostream>
 #include <sstream>
 #include <string>
 // Design:
@@ -10,56 +11,73 @@
 // Drawable items includes:
 // dot, array-line, frame (with name)
 
-namespace {
-//! @brief Generate a <g> group tag with it's translation and rotation set to
-//! the given tf
-//! @param tf The transform for the group to be at
-//! @return The string of group header: note it's missing the closing </g>
-//! bracket, caller should arrange adding that.
-std::string TransformToGroupTagHeader(turtlelib::Transform2D tf) {
-  std::stringstream ss;
-  ss << "<g transform=\"translate(" << tf.translation().x <<"," <<tf.translation().y
-     << ") rotate(" << turtlelib::rad2deg(tf.rotation()) << ")\" >\n";
-  return ss.str();
-}
-} // namespace
-
 namespace turtlelib {
 
-bool Svg::WriteToFile(std::filesystem::path file_path) {}
-void Svg::AddObject(Point2D point, Transform2D base_frame) {
-  constructed_objects+="\n"+TransformToGroupTagHeader(base_frame);
+std::string Svg::MakeObject(Point2D point) {
   std::stringstream ss;
-  ss << "  <circle cx=\"" << point.x << "\" cy=\"" << point.y
+  ss << "<circle cx=\"" << point.x << "\" cy=\"" << point.y
      << "\" r=\"3\" stroke=\"blue\" fill=\"tan\" stroke-width=\"1\" />\n";
-  constructed_objects += ss.str() + "</g>";
+  return ss.str();
 }
-void Svg::AddObject(Vector2D vec, Transform2D base_frame) {
-  constructed_objects+="\n"+TransformToGroupTagHeader(base_frame);
+std::string Svg::MakeObject(Vector2D vec) {
   std::stringstream ss;
 
-  ss << "  <line x1=\"" << vec.x << "\" y1=\"" << vec.y
+  ss << "<line x1=\"" << vec.x << "\" y1=\"" << vec.y
      << "\" stroke=\"purple\" stroke-width=\"2\" "
         "marker-start=\"url(#Arrow1Sstart)\" />\n";
-  constructed_objects += ss.str() + "</g>";
+  return ss.str();
 }
-void Svg::AddFrame(Transform2D tf,std::string name, Transform2D base_frame) {
+std::string Svg::MakeFrame(Transform2D tf, std::string name) {
 
-  constructed_objects+="\n"+TransformToGroupTagHeader(tf);
   std::stringstream ss;
+  ss << "<line x1=\"20\" stroke=\"red\" stroke-width=\"2\" "
+        "marker-start=\"url(#Arrow1Sstart)\" />\n"
+        "<line y1=\"20\" stroke=\"green\" stroke-width=\"2\" "
+        "marker-start=\"url(#Arrow1Sstart)\" />\n"
+        "<text x=\"5\" y=\"20\" font-size=\"10\">{"
+     << name << "}</text>\n";
 
-<line x1="20" stroke="red" stroke-width="2" marker-start="url(#Arrow1Sstart)" />\n
-<line y1="20" stroke="green" stroke-width="2" marker-start="url(#Arrow1Sstart)" />\n
-<text x="5" y="20" font-size="10">{a}</text>
-
-
-  constructed_objects += ss.str() + "</g>";
-
-
+  return WarpWithGroupTransform(ss.str(), tf);
+  ;
 }
 
-  std::string Svg::GetConstructedObjects(){
-    return constructed_objects;
-  }
+std::string Svg::WarpFileHeader(std::string contents) {
+  return "<svg width=\"400\" height=\"400\" viewBox=\"0 0 400 400\" "
+         "xmlns=\"http://www.w3.org/2000/svg\">\n\n"
+
+         "<defs>\n"
+         "  <marker\n"
+         "     style=\"overflow:visible\"\n"
+         "     id=\"Arrow1Sstart\"\n"
+         "     refX=\"0.0\"\n"
+         "     refY=\"0.0\"\n"
+         "     orient=\"auto\">\n"
+         "       <path\n"
+         "         transform=\"scale(0.2) translate(6)\"\n"
+         "         style=\"fill-rule: evenodd; stroke-width: 1pt; fill: "
+         "context-stroke; stroke: context-stroke\"\n"
+         "         d=\"M 0 0 L 5 -5 L -12.5 0 L 5 5 L 0 0 z\"\n"
+         "         />\n"
+         "    </marker>\n"
+         "</defs>\n\n" +
+         contents + "\n</svg>\n";
+}
+
+std::string Svg::WarpWithGroupTransform(std::string content,
+                                        Transform2D wrapping_tf) {
+  std::stringstream ss;
+  ss << "<g transform=\"translate(" << wrapping_tf.translation().x << ","
+     << wrapping_tf.translation().y << ") rotate("
+     << turtlelib::rad2deg(wrapping_tf.rotation()) << ")\" >\n";
+  ss << content << "</g>";
+  return ss.str();
+}
+
+
+std::ostream& Svg::FinishAndWriteToFile(std::ostream &out_stream , std::string content){
+  out_stream << WarpFileHeader(content);
+  return out_stream;
+}
+
 
 } // namespace turtlelib
