@@ -16,8 +16,7 @@ option(BUILD_DOCS "Build the documentation" OFF)
 # you don't need or want to.
 # name is the name of the library without the extension or lib prefix
 # name creates a cmake "target"
-add_library(turtlelib src/geometry2d.cpp)
-# add_library(turtlelib src/geometry2d.cpp src/libfile2.cpp)
+add_library(turtlelib src/geometry2d.cpp src/se2d.cpp)
 
 # Use target_include_directories so that #include"mylibrary/header.hpp" works
 # The use of the <BUILD_INTERFACE> and <INSTALL_INTERFACE> is because when
@@ -84,9 +83,12 @@ if(BUILD_TESTING)
     # A test is just an executable that is linked against the unit testing library
     add_executable(test_geometry2d tests/test_geometry2d.cpp)
     target_link_libraries(test_geometry2d Catch2::Catch2WithMain turtlelib)
+    add_executable(test_se2d tests/test_se2d.cpp)
+    target_link_libraries(test_se2d Catch2::Catch2WithMain turtlelib)
 
     # register the test with CTest, telling it what executable to run
     add_test(NAME geometry2d_test COMMAND test_geometry2d)
+    add_test(NAME se2d_test COMMAND test_se2d)
 endif()
 
 
