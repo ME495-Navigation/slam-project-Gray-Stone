@@ -13,7 +13,6 @@ namespace turtlelib
     using Catch::Matchers::WithinRel;
     TEST_CASE("Normalizing angles")
     {
-
         // double base_angle = 3* PI /2;
         REQUIRE_THAT(normalize_angle(PI), WithinRel(PI));
         REQUIRE_THAT(normalize_angle(-PI), WithinRel(PI));

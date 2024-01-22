@@ -93,18 +93,16 @@ public:
 
 private:
   // Since se2 only have 6 number of interest, we skip the last row.
-  std::array<double, 3> row1{0.0, 0.0, 0.0};
-  std::array<double, 3> row2{0.0, 0.0, 0.0};
+  double x = 0;
+  double y = 0;
+  double cos_t = 1.0;
+  double sin_t = 0;
 
   // Only value needed in further calculation is actually sin cos x y
-  // The transformation matrix is 
+  // The transformation matrix is
   // [ cos_t -sin_t x]
   // [ sin_t  cos_t y]
   // [ 0      0     1]
-  double x=0;
-  double y=0;
-  double cos_t=1.0;
-  double sin_t=0;
 };
 
 /// \brief should print a human readable version of the transform:

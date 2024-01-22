@@ -16,21 +16,19 @@ namespace turtlelib {
 //! them
 class Svg {
 public:
-  std::string WarpFileHeader(std::string contents);
-  std::ostream& FinishAndWriteToFile(std::ostream &out_stream, std::string content);
-  std::string MakeObject(Point2D point);
-  std::string MakeObject(Vector2D vec);
-  std::string MakeFrame(Transform2D tf, std::string name);
+  void AddObject(Point2D point, std::string color,
+                 Transform2D base_frame = {{0, 0}, 0});
+  void AddObject(Vector2D vec, std::string color,
+                 Transform2D base_frame = {{0, 0}, 0});
+  void AddObject(Transform2D tf, std::string name,
+                 Transform2D base_frame = {{0, 0}, 0});
+  friend std::ostream &operator<<(std::ostream &os, const Svg &svg);
 
-  //! @brief Generate a <g> group tag with it's translation and rotation set to
-  //! the given tf
-  //! @param content content inside the <g> group
-  //! @param wrapping_tf The transform for the group to be at
-  //! @return given content wrapped in group <g>
-  std::string WarpWithGroupTransform(std::string content,
-                                     Transform2D wrapping_tf);
+private:
+  // internal storage of added objects.
+  std::string constructed_objects;
 };
-
+std::ostream &operator<<(std::ostream &os, const Svg &svg);
 } // namespace turtlelib
 
 #endif

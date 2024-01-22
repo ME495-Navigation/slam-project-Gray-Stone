@@ -16,7 +16,7 @@ using Catch::Matchers::WithinRel;
 
 namespace turtlelib {
 
-TEST_CASE("Twist 2d ", "[Twist2D]") {
+TEST_CASE("Twist 2d stream test", "[Twist2D]") {
   // Setup needed later
   Twist2D twist_a{10.5, 2, 1};
   // Point2D point_b{3, 1};
@@ -57,7 +57,7 @@ TEST_CASE("Twist 2d ", "[Twist2D]") {
   }
 }
 
-TEST_CASE("Transform2D constructor test", "[Transform2D]") {
+TEST_CASE("Transform2D constructor and getter test", "[Transform2D]") {
   SECTION("base_constructor") {
     Transform2D tf;
     REQUIRE_THAT(tf.translation().x, WithinRel(0.0));
@@ -89,5 +89,100 @@ TEST_CASE("Transform2D constructor test", "[Transform2D]") {
   }
 }
 
-TEST_CASE("transform math", "[Transform2D]") {}
+TEST_CASE("Transform 2d stream test", "[Twist2D]") {
+  // Setup needed later
+  Transform2D tf{{10.5, 2}, deg2rad(18)};
+  // Point2D point_b{3, 1};
+
+  std::stringstream ss;
+  SECTION("OutStream") {
+
+    std::stringstream ss;
+    ss << tf;
+    REQUIRE_THAT(ss.str(), Equals("deg: 18 x: 10.5 y: 2"));
+  }
+  SECTION("InStream format1") {
+    Transform2D tf2;
+
+    ss << tf;
+    ss >> tf2;
+
+    REQUIRE_THAT(tf2.translation().x, WithinRel(10.5));
+    REQUIRE_THAT(tf2.translation().y, WithinRel(2.0));
+    REQUIRE_THAT(tf2.rotation(), WithinRel(deg2rad(18.0)));
+  }
+  SECTION("InStream format2") {
+    ss.str("11.2    22.5 80.8");
+    ss >> tf;
+    INFO(tf.translation().x);
+    REQUIRE_THAT(tf.rotation(), WithinRel(deg2rad(11.2)));
+    REQUIRE_THAT(tf.translation().x, WithinRel(22.5));
+    REQUIRE_THAT(tf.translation().y, WithinRel(80.8));
+  }
+}
+
+// The following are imported tests from Srikanth.
+TEST_CASE("operator()(Vector2D v)", "[transform]") { // Srikanth, Schelbert
+  double test_rot = -PI / 2.0;
+  Vector2D test_vec = {1.0, 1.0};
+  Transform2D T_ab{{test_vec}, test_rot};
+  Vector2D v_b{1, 1};
+  Vector2D v_a = T_ab(v_b);
+  REQUIRE_THAT(v_a.x, Catch::Matchers::WithinAbs(1.0, 1e-5));
+  REQUIRE_THAT(v_a.y, Catch::Matchers::WithinAbs(-1.0, 1e-5));
+}
+
+TEST_CASE("operator()(Point2D v)", "[transform]") { // Srikanth, Schelbert
+  double test_rot = -PI / 2.0;
+  Vector2D test_vec = {1.0, 1.0};
+  Transform2D T_ab{{test_vec}, test_rot};
+  Point2D p_b{1, 1};
+  Point2D p_a = T_ab(p_b);
+  REQUIRE_THAT(p_a.x, Catch::Matchers::WithinAbs(2.0, 1e-5));
+  REQUIRE_THAT(p_a.y, Catch::Matchers::WithinAbs(0.0, 1e-5));
+}
+
+TEST_CASE("operator()(Twist2D t)", "[transform]") { // Srikanth Schelbert
+  double test_rot = PI / 2.0;
+  Vector2D test_vec = {0.0, 1.0};
+  Transform2D T_ab{{test_vec}, test_rot};
+  Twist2D T_b{1, 1, 1};
+  Twist2D T_a = T_ab(T_b);
+  REQUIRE_THAT(T_a.omega, Catch::Matchers::WithinAbs(1.0, 1e-5));
+  REQUIRE_THAT(T_a.x, Catch::Matchers::WithinAbs(0.0, 1e-5));
+  REQUIRE_THAT(T_a.y, Catch::Matchers::WithinAbs(1.0, 1e-5));
+}
+
+TEST_CASE("inverse - inv()", "[transform]") { // Srikanth, Schelbert
+  double test_rot = -PI / 2.0;
+  double test_x = 1.0;
+  double test_y = 1.0; // Just make this a vector
+  Transform2D T_test{{test_x, test_y}, test_rot};
+  Transform2D T_test_inv = T_test.inv();
+  REQUIRE(T_test.inv().rotation() == -test_rot);
+  REQUIRE_THAT(T_test_inv.translation().x,
+               Catch::Matchers::WithinAbs(1.0, 1e-5));
+  REQUIRE_THAT(T_test_inv.translation().y,
+               Catch::Matchers::WithinAbs(-1.0, 1e-5));
+}
+
+TEST_CASE("matrix mult operator - operator*=",
+          "[transform]") { // Srikanth, Schelbert
+  Vector2D test_trans_ab = {1.0, 2.0};
+  double test_rot_ab = 0.0;
+  Vector2D test_trans_bc = {2.0, 3.0};
+  double test_rot_bc = PI / 2;
+  Transform2D T_ab1 = {test_trans_ab, test_rot_ab};
+  Transform2D T_ab2 = {test_trans_ab, test_rot_ab};
+  Transform2D T_ab3 = {test_trans_ab,
+                       test_rot_ab}; // made 3 since fcn returns overwritten tf
+  Transform2D T_bc = {test_trans_bc, test_rot_bc};
+  REQUIRE_THAT((T_ab1 *= T_bc).translation().x,
+               Catch::Matchers::WithinAbs(3.0, 1e-5));
+  REQUIRE_THAT((T_ab2 *= T_bc).translation().y,
+               Catch::Matchers::WithinAbs(5.0, 1e-5));
+  REQUIRE_THAT((T_ab3 *= T_bc).rotation(),
+               Catch::Matchers::WithinAbs(PI / 2.0, 1e-5));
+}
+
 } // namespace turtlelib

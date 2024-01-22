@@ -14,29 +14,58 @@ namespace turtlelib {
 TEST_CASE("svg test ", "[svg]") {
   Svg svg;
 
-  Transform2D space_frame{{50, 50}, deg2rad(22.2)};
+  std::ostringstream oss;
 
-  INFO("Generated point: ");
+  SECTION("Svg file header", "[svg]") {
 
-  SECTION("Frame wrapping", "[svg]") {
-    REQUIRE_THAT(
-        svg.WarpWithGroupTransform("<internal_content>", space_frame),
-        StartsWith("<g transform=\"translate(50,50) rotate(22.2)\" >") &&
-            EndsWith("</g>") && ContainsSubstring(("<internal_content>")));
+    // Note the ending new line, This matters
+    oss << svg;
+    REQUIRE_THAT(oss.str(), StartsWith("<svg") && EndsWith("</svg>\n"));
   }
 
   SECTION("Point Object test", "[svg]") {
-
-    REQUIRE_THAT(svg.MakeObject(Point2D{10, -10}),
-                 ContainsSubstring("<circle cx=\"10\" cy=\"-10\" r=\"3\" stroke=\"blue\" "
-                        "fill=\"tan\" stroke-width=\"1\" />"));
+    svg.AddObject(Point2D{10, -10}, "blue");
+    oss << svg;
+    REQUIRE_THAT(oss.str(),
+                 ContainsSubstring(
+                     "<circle cx=\"10\" cy=\"-10\" r=\"3\" stroke=\"blue\" "
+                     "fill=\"blue\" stroke-width=\"1\" />"));
   }
 
   SECTION("Vector2D Object test", "[svg]") {
+    svg.AddObject(Vector2D{-5, 9}, "purple");
+    oss << svg;
+
     REQUIRE_THAT(
-        svg.MakeObject(Vector2D{-5, 9}),
-        ContainsSubstring("<line x1=\"-5\" y1=\"9\" stroke=\"purple\" stroke-width=\"2\" "
-               "marker-start=\"url(#Arrow1Sstart)\" />"));
+        oss.str(),
+        ContainsSubstring(
+            "<line x1=\"-5\" y1=\"9\" stroke=\"purple\" stroke-width=\"2\" "
+            "marker-start=\"url(#Arrow1Sstart)\" />"));
+  }
+
+  SECTION("Frame Object test", "[svg]") {
+    Transform2D frame_1{{50, 50}, deg2rad(22.2)};
+
+    svg.AddObject(frame_1, "some_name");
+    oss << svg;
+
+    REQUIRE_THAT(
+        oss.str(),
+        ContainsSubstring(
+            R"xxx(<g transform="translate(0,0) rotate(0)" >)xxx"
+            "\n"
+            R"xxx(<g transform="translate(50,50) rotate(22.2)" >)xxx"
+            "\n"
+            R"xxx(<line x1="20" stroke="red" stroke-width="2" marker-start="url(#Arrow1Sstart)" />)xxx"
+            "\n"
+            R"xxx(<line y1="20" stroke="green" stroke-width="2" marker-start="url(#Arrow1Sstart)" />)xxx"
+            "\n"
+            R"xxx(<text x="5" y="20" font-size="10">{some_name}</text>)xxx"
+            "\n"
+            R"xxx(</g>)xxx"
+            "\n"
+            R"xxx(</g>)xxx"
+            "\n"));
   }
 }
 } // namespace turtlelib
