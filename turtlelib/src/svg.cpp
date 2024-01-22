@@ -13,8 +13,9 @@
 
 namespace {
 
-const unsigned int kPageWidth = 400;
-const unsigned int kPageHeight = 517;
+const double kScaleUp = 20;
+const unsigned int kPageWidth = 100;
+const unsigned int kPageHeight = 120;
 
 //! @brief Warp the content with a <g> group tag with it's translation and
 //! rotation set to the given tf
@@ -24,8 +25,8 @@ const unsigned int kPageHeight = 517;
 std::string WarpWithGroupTransform(std::string content,
                                    turtlelib::Transform2D wrapping_tf) {
   std::stringstream ss;
-  ss << "<g transform=\"translate(" << wrapping_tf.translation().x << ","
-     << wrapping_tf.translation().y << ") rotate("
+  ss << "<g transform=\"translate(" << wrapping_tf.translation().x* kScaleUp << ","
+     << wrapping_tf.translation().y* kScaleUp << ") rotate("
      << turtlelib::rad2deg(wrapping_tf.rotation()) << ")\" >\n";
   ss << content << "</g>\n";
   return ss.str();
@@ -41,7 +42,7 @@ namespace turtlelib {
 
 void Svg::AddObject(Point2D point, std::string color, Transform2D base_frame) {
   std::stringstream ss;
-  ss << "  <circle cx=\"" << point.x << "\" cy=\"" << point.y
+  ss << "  <circle cx=\"" << point.x *kScaleUp << "\" cy=\"" << point.y * kScaleUp 
      << "\" r=\"3\" stroke=\"" << color << "\" fill=\"" << color
      << "\" stroke-width=\"1\" />\n";
   constructed_objects += "\n\n" + WarpWithGroupTransform(ss.str(), base_frame);
@@ -50,7 +51,7 @@ void Svg::AddObject(Point2D point, std::string color, Transform2D base_frame) {
 void Svg::AddObject(Vector2D vec, std::string color, Transform2D base_frame) {
   std::stringstream ss;
 
-  ss << "  <line x1=\"" << vec.x << "\" y1=\"" << vec.y << "\" stroke=\""
+  ss << "  <line x1=\"" << vec.x * kScaleUp << "\" y1=\"" << vec.y * kScaleUp << "\" stroke=\""
      << color
      << "\" stroke-width=\"2\" "
         "marker-start=\"url(#Arrow1Sstart)\" />\n";

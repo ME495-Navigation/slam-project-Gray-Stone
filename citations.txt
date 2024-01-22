@@ -2,7 +2,7 @@
 
 ## External sources
 
----------- [1] ---------- 
+---------- [1] ----------
 2024-01-14T23:05:34Z-06 
 
 Solve issue with launch file error on xacro output when py launch is nested in xml launch file. 
@@ -10,9 +10,16 @@ Solve issue with launch file error on xacro output when py launch is nested in x
 https://answers.ros.org/question/417369/caught-exception-in-launch-see-debug-for-traceback-unable-to-parse-the-value-of-parameter-robot_description-as-yaml/
 
 
----------- [2] ---------- 
+---------- [2] ----------
 2024-01-18T01:27:26Z-06
 
 Normalize an angle 
 
 https://stackoverflow.com/a/22949941
+
+---------- [3] ----------
+2024-01-22T02:06:26Z-06
+
+Error checking in std cin 
+
+https://stackoverflow.com/questions/28635130/input-error-checking-in-c

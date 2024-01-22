@@ -90,6 +90,8 @@ namespace turtlelib
 
         /// \brief the y coordinate
         double y = 0.0;
+
+        Vector2D normalize() const;
     };
 
     /// \brief Subtracting one point from another yields a vector

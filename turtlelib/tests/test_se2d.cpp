@@ -20,10 +20,11 @@ TEST_CASE("Twist 2d stream test", "[Twist2D]") {
   // Setup needed later
   Twist2D twist_a{10.5, 2, 1};
   // Point2D point_b{3, 1};
+  std::stringstream ss;
+  Twist2D out_twist;
 
   SECTION("OutStream") {
 
-    std::stringstream ss;
     ss << twist_a;
     REQUIRE_THAT(ss.str(), Equals("[10.5 2 1]"));
     twist_a.x = 3.33;
@@ -40,20 +41,26 @@ TEST_CASE("Twist 2d stream test", "[Twist2D]") {
     REQUIRE_THAT(ss.str(), Equals("[-10.3 3.33 10.678]"));
   }
   SECTION("InStream") {
-    std::stringstream ss;
     ss << twist_a;
 
-    Twist2D out_twist;
     ss >> out_twist;
+    REQUIRE_THAT(out_twist.omega, WithinRel(twist_a.omega));
     REQUIRE_THAT(out_twist.x, WithinRel(twist_a.x));
     REQUIRE_THAT(out_twist.y, WithinRel(twist_a.y));
-    REQUIRE_THAT(out_twist.omega, WithinRel(twist_a.omega));
-
+  SECTION("InStream2"){
     ss.str("1203.9 -10   20.12345");
     ss >> out_twist;
+    REQUIRE_THAT(out_twist.omega, WithinRel(1203.9));
     REQUIRE_THAT(out_twist.x, WithinRel(-10.0f));
     REQUIRE_THAT(out_twist.y, WithinRel(20.12345));
-    REQUIRE_THAT(out_twist.omega, WithinRel(1203.9));
+  }
+  SECTION("Instream3"){
+    ss.str("1 1 1");
+    ss >> out_twist;
+    REQUIRE_THAT(out_twist.omega, WithinRel(1.0));
+    REQUIRE_THAT(out_twist.x, WithinRel(1.0));
+    REQUIRE_THAT(out_twist.y, WithinRel(1.0));
+  }
   }
 }
 
