@@ -32,6 +32,11 @@ namespace turtlelib
         return is;
     }
 
+    Vector2D Vector2D::normalize() const{
+       double norm = sqrt(x*x + y*y);
+       return {x/norm,y/norm};
+    }
+
     Vector2D operator-(const Point2D &head, const Point2D &tail)
     {
         return {head.x - tail.x, head.y - tail.y};
