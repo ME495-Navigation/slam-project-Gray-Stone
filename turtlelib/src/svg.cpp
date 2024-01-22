@@ -13,9 +13,9 @@
 
 namespace {
 
-const double kScaleUp = 20;
-const unsigned int kPageWidth = 100;
-const unsigned int kPageHeight = 120;
+const double kScaleUp = 96;
+const unsigned int kPageWidth = 816;
+const unsigned int kPageHeight = 1056;
 
 //! @brief Warp the content with a <g> group tag with it's translation and
 //! rotation set to the given tf
@@ -65,9 +65,9 @@ void Svg::AddObject(Transform2D tf, std::string name, Transform2D base_frame) {
   // Since we are flipping everything around at the end, Text is the special
   // item needs to be "pre-flipped"
 
-  ss << "<line x1=\"20\" stroke=\"red\" stroke-width=\"2\" "
+  ss << "<line x1=\""<< 1*kScaleUp <<"\" stroke=\"red\" stroke-width=\"2\" "
         "marker-start=\"url(#Arrow1Sstart)\" />\n"
-        "<line y1=\"20\" stroke=\"green\" stroke-width=\"2\" "
+        "<line y1=\""<<1*kScaleUp<<"\" stroke=\"green\" stroke-width=\"2\" "
         "marker-start=\"url(#Arrow1Sstart)\" />\n"
         "<text x=\"5\" y=\"-10\" font-size=\"10\" transform=\"scale(1,-1)\" >{"
      << name << "}</text>\n";
@@ -78,11 +78,12 @@ void Svg::AddObject(Transform2D tf, std::string name, Transform2D base_frame) {
 
 std::ostream &operator<<(std::ostream &os, const Svg &svg) {
 
-  os << "<svg width=\"" << kPageWidth << "\" height=\"" << kPageHeight
-     << "\" viewBox=\"0 0 " << kPageWidth << " " << kPageHeight
-     << "\" "
-        "xmlns=\"http://www.w3.org/2000/svg\">\n\n"
+//   os << "<svg width=\"" << kPageWidth << "\" height=\"" << kPageHeight
+//      << "\" viewBox=\"0 0 " << kPageWidth << " " << kPageHeight
+//      << "\" "
 
+
+     os << "<svg width=\"8.500000in\" height=\"11.000000in\" viewBox=\"0 0 816.000000 1056.000000\" xmlns=\"http://www.w3.org/2000/svg\">\n"
         "<defs>\n"
         "  <marker\n"
         "     style=\"overflow:visible\"\n"

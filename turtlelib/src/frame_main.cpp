@@ -80,8 +80,8 @@ int main() {
   //     Use purple to draw p_a, brown to draw p_b, and orange to draw p_c.
   // TODO(LEO) what frame to put these in?
   svg.AddObject(p_a, "purple");
-  svg.AddObject(p_b, "brown");
-  svg.AddObject(p_c, "orange");
+  svg.AddObject(p_b, "brown",Tab);
+  svg.AddObject(p_c, "orange",Tac);
 
   // Prompt the user to enter a vector vb in frame b
 
