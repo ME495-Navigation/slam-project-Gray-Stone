@@ -1,3 +1,28 @@
+//! @file nu turtlebot simulator
+
+// Parameters: 
+//    rate: int - frequency of simulation timer updates (hz)
+//    x0: double - Initial x position
+//    y0: double - Initial y position
+//    theta0: double - Initial theta position
+//    arena_x_length: double - x length of arena
+//    arena_y_length: double - y length of arena
+//    obstacles/x: vector<double> - List of obstical's x coordinates
+//    obstacles/y: vector<double> - List of obstical's y coordinates
+//    obstacles/r: double - obstacle's radius, all obstacle share this radius 
+//
+// Publishers:
+//   /nusim/obstacles: visualization_msgs/msg/MarkerArray
+//   /nusim/timestep: std_msgs/msg/UInt64
+//   /nusim/walls: visualization_msgs/msg/MarkerArray
+//   /parameter_events: rcl_interfaces/msg/ParameterEvent
+//   /tf: tf2_msgs/msg/TFMessage
+// 
+// Service Servers:
+//   /nusim/reset: std_srvs/srv/Empty
+//   /nusim/teleport: nusim/srv/Teleport
+
+
 #include <rmw/qos_profiles.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_ros/transform_broadcaster.h>
@@ -36,6 +61,7 @@ auto GenParamDescriptor(std::string name, std::string description)
 }
 }  // namespace
 
+//! @brief This class is the nusim node itself. Holds everything the node needs.
 class NuSim : public rclcpp::Node
 {
 public:
@@ -86,6 +112,7 @@ public:
 
     if (obstacles_x.size() != obstacles_y.size() ) {
       RCLCPP_ERROR(get_logger(), "Mismatch obstacle x y numbers");
+      exit(1);
     }
     PublishObstacles(obstacles_x, obstacles_y, obstacles_r);
 
@@ -162,6 +189,14 @@ private:
   // A default argument is evaluated each time the function is called with no argument for the
   // corresponding parameter.
 
+  //! @brief Generate a TransformStamped object for 2D transform
+  //! @param x x position of transform
+  //! @param y y position of transform 
+  //! @param theta rotation in z axis 
+  //! @param parent_frame_id frame name for parent 
+  //! @param child_frame_id frame name for child 
+  //! @param time_stamp_opt optional time stamp (default to current time)
+  //! @return a populated TransformStamped object from given infos.
   geometry_msgs::msg::TransformStamped Gen2DTransform(
     double x, double y, double theta, std::string parent_frame_id, std::string child_frame_id,
     std::optional<rclcpp::Time> time_stamp_opt = std::nullopt)
@@ -183,6 +218,9 @@ private:
     return tf_stamped;
   }
 
+  //! @brief Publish visualization markers for arena walls 
+  //! @param x_length Wall length in x
+  //! @param y_length Wall length in y
   void PublishArenaWalls(double x_length, double y_length)
   {
     auto profile = rmw_qos_profile_default;
@@ -234,6 +272,10 @@ private:
     std::cout << "Published markers" << std::endl;
   }
 
+  //! @brief Publish vitilization markers for obstacles 
+  //! @param x_s list of x for each obstacle
+  //! @param y_s list of y for each obstacle 
+  //! @param rad radius for all obstacle
   void PublishObstacles(std::vector<double> x_s, std::vector<double> y_s, double rad)
   {
     auto profile = rmw_qos_profile_default;
@@ -288,6 +330,7 @@ private:
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 };
 
+//! @brief Main entry point for the nusim node
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
