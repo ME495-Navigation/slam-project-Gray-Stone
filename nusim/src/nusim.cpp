@@ -1,24 +1,28 @@
+#include <rmw/qos_profiles.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_ros/transform_broadcaster.h>
+
 #include <atomic>
 #include <chrono>
 #include <functional>
+#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <memory>
-#include <string>
-
-#include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/string.hpp"
-#include "std_msgs/msg/u_int64.hpp"
-#include "std_srvs/srv/empty.hpp"
-#include "nusim/srv/teleport.hpp"
-#include "tf2/LinearMath/Quaternion.h"
 #include <optional>
+#include <rclcpp/qos.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/string.hpp>
+#include <std_msgs/msg/u_int64.hpp>
+#include <std_srvs/srv/empty.hpp>
+#include <string>
+#include <visualization_msgs/msg/marker.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 
-#include "tf2_ros/transform_broadcaster.h"
-#include "geometry_msgs/msg/transform_stamped.hpp"
-
-
+#include "nusim/srv/teleport.hpp"
 // using namespace std::chrono_literals;
 namespace
 {
+
+std::string kWorldFrame = "nusim/world";
 //! @brief Generate param descriptor object
 //! @param name name of the parameter
 //! @param description description of the parameter
@@ -38,31 +42,54 @@ public:
   NuSim()
   : Node("nusim"),
     time_step_(0)
-    // TODO(LEO) I hope to init these param properly, but ros param is only accessible after node is made.
-    // x0(x_init),
-    // y0(y_init),
-    // theta0(theta_init),
-    // current_x(x_init),
-    // current_y(y_init),
+    // TODO(LEO) I hope to init these param properly, but ros param is only accessible after node is
+    // made. x0(x_init), y0(y_init), theta0(theta_init), current_x(x_init), current_y(y_init),
     // current_theta(theta_init)
   {
-
     // Parameters
     declare_parameter<int>("rate", 200, GenParamDescriptor("rate", "The rate of main timer"));
     int rate = get_parameter("rate").as_int();
 
-    declare_parameter<double>(
-      "x0", 0.0,
-      GenParamDescriptor("x0", "Initial x position"));
+    declare_parameter<double>("x0", 0.0, GenParamDescriptor("x0", "Initial x position"));
     x0 = get_parameter("x0").as_double();
-    declare_parameter<double>(
-      "y0", 0.0,
-      GenParamDescriptor("y0", "Initial y position"));
+    declare_parameter<double>("y0", 0.0, GenParamDescriptor("y0", "Initial y position"));
     y0 = get_parameter("y0").as_double();
-    declare_parameter<double>(
-      "theta0", 0.0,
-      GenParamDescriptor("theta0", "Initial z position"));
+    declare_parameter<double>("theta0", 0.0, GenParamDescriptor("theta0", "Initial z position"));
     theta0 = get_parameter("theta0").as_double();
+
+
+    // Arena wall stuff
+    declare_parameter<double>(
+      "arena_x_length", 5.0,
+      GenParamDescriptor("arena_x_length", "x length of arena"));
+    double arena_x_length = get_parameter("arena_x_length").as_double();
+    declare_parameter<double>(
+      "arena_y_length", 3.0,
+      GenParamDescriptor("arena_y_length", "x length of arena"));
+    double arena_y_length = get_parameter("arena_y_length").as_double();
+
+    PublishArenaWalls(arena_x_length, arena_y_length);
+
+    // obstacle stuff
+    declare_parameter<std::vector<double>>(
+      "obstacles/x",
+      GenParamDescriptor("obstacles/x", "list of obstacle's x coord"));
+    std::vector<double> obstacles_x = get_parameter("obstacles/x").as_double_array();
+    declare_parameter<std::vector<double>>(
+      "obstacles/y",
+      GenParamDescriptor("obstacles/y", "list of obstacle's y coord"));
+    std::vector<double> obstacles_y = get_parameter("obstacles/y").as_double_array();
+    declare_parameter<double>(
+      "obstacles/r",
+      GenParamDescriptor("obstacles/r", "obstacle radius"));
+    double obstacles_r = get_parameter("obstacles/r").as_double();
+
+    if (obstacles_x.size() != obstacles_y.size() ) {
+      RCLCPP_ERROR(get_logger(), "Mismatch obstacle x y numbers");
+    }
+    PublishObstacles(obstacles_x, obstacles_y, obstacles_r);
+
+    // Rest of init
 
     current_x = x0;
     current_y = y0;
@@ -70,15 +97,16 @@ public:
     // Setup pub/sub and srv/client
     time_step_publisher_ = create_publisher<std_msgs::msg::UInt64>("~/timestep", 10);
 
-    tf_broadcaster_ =
-      std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+    tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
     reset_service_ = create_service<std_srvs::srv::Empty>(
-      "~/reset", std::bind(&NuSim::reset_srv, this, std::placeholders::_1, std::placeholders::_2));
+      "~/reset",
+      std::bind(&NuSim::reset_srv, this, std::placeholders::_1, std::placeholders::_2));
 
     teleport_service_ = create_service<nusim::srv::Teleport>(
       "~/teleport",
       std::bind(&NuSim::teleport_callback, this, std::placeholders::_1, std::placeholders::_2));
+
 
     // Setup timer and set things in motion.
     main_timer_ = this->create_wall_timer(
@@ -97,9 +125,8 @@ private:
     time_step_publisher_->publish(msg);
 
     // Publish TF for red robot
-    auto tf = Gen2DTransform(
-      current_x, current_y, current_theta, "nusim/world",
-      "red/base_footprint");
+    auto tf =
+      Gen2DTransform(current_x, current_y, current_theta, kWorldFrame, "red/base_footprint");
     tf_broadcaster_->sendTransform(tf);
   }
 
@@ -156,14 +183,97 @@ private:
     return tf_stamped;
   }
 
+  void PublishArenaWalls(double x_length, double y_length)
+  {
+    auto profile = rmw_qos_profile_default;
+    profile.durability = rmw_qos_durability_policy_e::RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL;
+    // rclcpp::QoSInitialization(rclcpp::KeepAll(),profile)
+    rclcpp::QoS qos(rclcpp::KeepLast(2), profile);
+    qos.durability(rclcpp::DurabilityPolicy::TransientLocal);
+    area_wall_publisher_ =
+      create_publisher<visualization_msgs::msg::MarkerArray>("~/walls", qos);
+
+    visualization_msgs::msg::MarkerArray msg;
+
+    visualization_msgs::msg::Marker wall_marker;
+    wall_marker.type = wall_marker.CUBE;
+    wall_marker.header.frame_id = kWorldFrame;
+    wall_marker.header.stamp = get_clock()->now();
+    wall_marker.scale.z = 0.25;
+    wall_marker.scale.y = y_length;
+    wall_marker.scale.x = x_length;
+    wall_marker.color.r = 1.0;
+    wall_marker.color.a = 1.0;
+    wall_marker.pose.position.z = 0.25 / 2;
+    visualization_msgs::msg::Marker x_plus_wall = wall_marker;
+    x_plus_wall.scale.x = 0.01;
+    x_plus_wall.pose.position.x = x_length / 2;
+    x_plus_wall.id = 1;
+
+    visualization_msgs::msg::Marker x_minus_wall = wall_marker;
+    x_minus_wall.scale.x = 0.01;
+    x_minus_wall.pose.position.x = -x_length / 2;
+    x_minus_wall.id = 2;
+
+    visualization_msgs::msg::Marker y_plus_wall = wall_marker;
+    y_plus_wall.scale.y = 0.01;
+    y_plus_wall.pose.position.y = y_length / 2;
+    y_plus_wall.id = 3;
+
+    visualization_msgs::msg::Marker y_minus_wall = wall_marker;
+    y_minus_wall.scale.y = 0.01;
+    y_minus_wall.pose.position.y = -y_length / 2;
+    y_minus_wall.id = 4;
+
+    msg.markers.push_back(x_plus_wall);
+    msg.markers.push_back(x_minus_wall);
+    msg.markers.push_back(y_plus_wall);
+    msg.markers.push_back(y_minus_wall);
+    area_wall_publisher_->publish(msg);
+
+    std::cout << "Published markers" << std::endl;
+  }
+
+  void PublishObstacles(std::vector<double> x_s, std::vector<double> y_s, double rad)
+  {
+    auto profile = rmw_qos_profile_default;
+    profile.durability = rmw_qos_durability_policy_e::RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL;
+    // rclcpp::QoSInitialization(rclcpp::KeepAll(),profile)
+    rclcpp::QoS qos(rclcpp::KeepLast(2), profile);
+    qos.durability(rclcpp::DurabilityPolicy::TransientLocal);
+    obstacle_publisher_ =
+      create_publisher<visualization_msgs::msg::MarkerArray>("~/obstacles", qos);
+
+    visualization_msgs::msg::MarkerArray msg;
+
+    for (size_t i = 0; i < x_s.size(); ++i) {
+      visualization_msgs::msg::Marker obstacle_marker;
+      obstacle_marker.header.frame_id = kWorldFrame;
+      obstacle_marker.header.stamp = get_clock()->now();
+      obstacle_marker.type = obstacle_marker.CYLINDER;
+      obstacle_marker.id = 10 + i;
+      obstacle_marker.scale.x = rad * 2;
+      obstacle_marker.scale.y = rad * 2;
+      obstacle_marker.scale.z = 0.25;
+      obstacle_marker.pose.position.x = x_s[i];
+      obstacle_marker.pose.position.y = y_s[i];
+      obstacle_marker.pose.position.z = 0.25 / 2;
+
+      obstacle_marker.color.r = 1.0;
+      obstacle_marker.color.a = 1.0;
+      msg.markers.push_back(obstacle_marker);
+    }
+    obstacle_publisher_->publish(msg);
+  }
+
   // Private Members
   //! atomic prevent timer and service call modify this together
   std::atomic<uint64_t> time_step_ = 0;
-  double x0 = 0;  // Init x location
-  double y0 = 0;  // Init y location
-  double theta0 = 0;  // Init theta location
-  double current_x = 0;  // Current x location
-  double current_y = 0;  // Current y location
+  double x0 = 0;             // Init x location
+  double y0 = 0;             // Init y location
+  double theta0 = 0;         // Init theta location
+  double current_x = 0;      // Current x location
+  double current_y = 0;      // Current y location
   double current_theta = 0;  // Current theta location
 
   // Private ros members
@@ -171,6 +281,10 @@ private:
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr reset_service_;
   rclcpp::Service<nusim::srv::Teleport>::SharedPtr teleport_service_;
   rclcpp::Publisher<std_msgs::msg::UInt64>::SharedPtr time_step_publisher_;
+  // The publisher need to be kept so the transient local message can still be available later
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr area_wall_publisher_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr obstacle_publisher_;
+
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 };
 

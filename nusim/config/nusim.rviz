@@ -8,13 +8,13 @@ Panels:
         - /Status1
         - /Grid1
         - /RedRobot1
-        - /PurpleRobot1
-        - /BlueRobot1
-        - /GreenRobot1
         - /TF1
         - /TF1/Frames1
+        - /Arena-MarkerArray1
+        - /Arena-MarkerArray1/Topic1
+        - /obstacle-MarkerArray1
       Splitter Ratio: 0.5451977252960205
-    Tree Height: 365
+    Tree Height: 725
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
@@ -124,53 +124,20 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /purple/robot_description
-      Enabled: true
+      Enabled: false
       Links:
         All Links Enabled: true
         Expand Joint Details: false
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        base_footprint:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        base_scan:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        caster_back_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        imu_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        wheel_left_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheel_right_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
       Mass Properties:
         Inertia: false
         Mass: false
       Name: PurpleRobot
       TF Prefix: purple
       Update Interval: 0
-      Value: true
+      Value: false
       Visual Enabled: true
     - Alpha: 1
       Class: rviz_default_plugins/RobotModel
@@ -183,53 +150,20 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /blue/robot_description
-      Enabled: true
+      Enabled: false
       Links:
         All Links Enabled: true
         Expand Joint Details: false
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        base_footprint:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        base_scan:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        caster_back_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        imu_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        wheel_left_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheel_right_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
       Mass Properties:
         Inertia: false
         Mass: false
       Name: BlueRobot
       TF Prefix: blue
       Update Interval: 0
-      Value: true
+      Value: false
       Visual Enabled: true
     - Alpha: 1
       Class: rviz_default_plugins/RobotModel
@@ -242,103 +176,28 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /green/robot_description
-      Enabled: true
+      Enabled: false
       Links:
         All Links Enabled: true
         Expand Joint Details: false
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        base_footprint:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        base_scan:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        caster_back_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        imu_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        wheel_left_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheel_right_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
       Mass Properties:
         Inertia: false
         Mass: false
       Name: GreenRobot
       TF Prefix: green
       Update Interval: 0
-      Value: true
+      Value: false
       Visual Enabled: true
     - Class: rviz_default_plugins/TF
       Enabled: true
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        blue/base_footprint:
-          Value: false
-        blue/base_link:
-          Value: false
-        blue/base_scan:
-          Value: false
-        blue/caster_back_link:
-          Value: false
-        blue/imu_link:
-          Value: false
-        blue/wheel_left_link:
-          Value: false
-        blue/wheel_right_link:
-          Value: false
-        green/base_footprint:
-          Value: false
-        green/base_link:
-          Value: false
-        green/base_scan:
-          Value: false
-        green/caster_back_link:
-          Value: false
-        green/imu_link:
-          Value: false
-        green/wheel_left_link:
-          Value: false
-        green/wheel_right_link:
-          Value: false
         nusim/world:
           Value: true
-        purple/base_footprint:
-          Value: false
-        purple/base_link:
-          Value: false
-        purple/base_scan:
-          Value: false
-        purple/caster_back_link:
-          Value: false
-        purple/imu_link:
-          Value: false
-        purple/wheel_left_link:
-          Value: false
-        purple/wheel_right_link:
-          Value: false
         red/base_footprint:
           Value: false
         red/base_link:
@@ -360,42 +219,6 @@ Visualization Manager:
       Show Names: false
       Tree:
         nusim/world:
-          blue/base_footprint:
-            blue/base_link:
-              blue/base_scan:
-                {}
-              blue/caster_back_link:
-                {}
-              blue/imu_link:
-                {}
-              blue/wheel_left_link:
-                {}
-              blue/wheel_right_link:
-                {}
-          green/base_footprint:
-            green/base_link:
-              green/base_scan:
-                {}
-              green/caster_back_link:
-                {}
-              green/imu_link:
-                {}
-              green/wheel_left_link:
-                {}
-              green/wheel_right_link:
-                {}
-          purple/base_footprint:
-            purple/base_link:
-              purple/base_scan:
-                {}
-              purple/caster_back_link:
-                {}
-              purple/imu_link:
-                {}
-              purple/wheel_left_link:
-                {}
-              purple/wheel_right_link:
-                {}
           red/base_footprint:
             red/base_link:
               red/base_scan:
@@ -409,6 +232,30 @@ Visualization Manager:
               red/wheel_right_link:
                 {}
       Update Interval: 0
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Arena-MarkerArray
+      Namespaces:
+        "": true
+      Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep All
+        Reliability Policy: Reliable
+        Value: nusim/walls
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: obstacle-MarkerArray
+      Namespaces:
+        "": true
+      Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep All
+        Reliability Policy: Reliable
+        Value: nusim/obstacles
       Value: true
   Enabled: true
   Global Options:
@@ -456,7 +303,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 1.141832947731018
+      Distance: 3.3464598655700684
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -471,18 +318,18 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.5853984355926514
+      Pitch: 0.880398154258728
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.6503987312316895
+      Yaw: 0.6153988242149353
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 691
+  Height: 1051
   Hide Left Dock: false
   Hide Right Dock: true
-  QMainWindow State: 000000ff00000000fd00000004000000000000019000000211fc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000007901000003fb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000002e00000211000000fd01000003fb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261000000010000011000000211fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000002e00000211000000d301000003fb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000005000000004cfc0100000002fb0000000800540069006d0065010000000000000500000002bd01000003fb0000000800540069006d006501000000000000045000000000000000000000036f0000021100000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000019000000379fc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000007901000003fb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000002e00000379000000fd01000003fb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261000000010000011000000211fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000002e00000211000000d301000003fb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007800000004cfc0100000002fb0000000800540069006d0065010000000000000780000002bd01000003fb0000000800540069006d00650100000000000004500000000000000000000005ef0000037900000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -491,6 +338,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: true
-  Width: 1280
-  X: 2187
-  Y: 144
+  Width: 1920
+  X: 1920
+  Y: 0

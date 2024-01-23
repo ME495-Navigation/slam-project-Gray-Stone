@@ -12,6 +12,8 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(visualization_msgs REQUIRED)
+
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(
@@ -39,7 +41,7 @@ rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME}_IDL
 add_executable(nusim src/nusim.cpp)
 
 # https://robotics.stackexchange.com/questions/23171/creating-a-custom-msg-in-ros2
-ament_target_dependencies(nusim rclcpp std_msgs std_srvs tf2 tf2_ros)
+ament_target_dependencies(nusim rclcpp std_msgs std_srvs tf2 tf2_ros visualization_msgs)
 target_link_libraries(nusim ${cpp_typesupport_target})
 install(TARGETS nusim DESTINATION lib/${PROJECT_NAME})
 

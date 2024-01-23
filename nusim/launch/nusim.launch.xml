@@ -2,8 +2,12 @@
 
     <!-- <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share diff_drive)/config/ddrive_view.rviz" /> -->
 
+
+    <arg name="config_file" default="$(find-pkg-share nusim)/config/basic_world.yaml"
+    description="Parameter Config file for nusim, default at $(find-pkg-share nusim)/config/basic_world.yaml" />
+
     <node pkg="nusim" exec="nusim" output="screen">
-        <param from="$(find-pkg-share nusim)/config/basic_world.yaml" />
+        <param from="$(var config_file)" />
     </node>
 
     <!-- To show red turtle bot -->
