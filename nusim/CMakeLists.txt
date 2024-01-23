@@ -12,18 +12,22 @@ find_package(std_srvs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
-
-add_executable(nusim src/nusim.cpp)
-
-ament_target_dependencies(nusim rclcpp std_msgs std_srvs)
-
 rosidl_generate_interfaces(${PROJECT_NAME}_idl
   "srv/Teleport.srv"
   # DEPENDENCIES geometry_msgs # Add packages that above messages depend on, in this case geometry_msgs for Sphere.msg
 )
+
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME}_idl "rosidl_typesupport_cpp")
+
+
+add_executable(nusim src/nusim.cpp)
+
+
+# https://robotics.stackexchange.com/questions/23171/creating-a-custom-msg-in-ros2
+ament_target_dependencies(nusim rclcpp std_msgs std_srvs)
+target_link_libraries(nusim ${cpp_typesupport_target})
+
+
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
