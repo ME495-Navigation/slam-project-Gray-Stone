@@ -1,0 +1,17 @@
+<launch>
+
+    <!-- <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share diff_drive)/config/ddrive_view.rviz" /> -->
+
+    <node pkg="nusim" exec="nusim" output="screen">
+        <param from="$(find-pkg-share nusim)/config/basic_world.yaml" />
+    </node>
+
+    <!-- To show red turtle bot -->
+    <include file="$(find-pkg-share nuturtle_description)/launch/load_one.launch.py">
+        <arg name="use_rviz" value="False" />
+        <arg name="color" value="red" />
+    </include>
+
+    <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share nusim)/config/nusim.rviz"/>
+
+</launch>

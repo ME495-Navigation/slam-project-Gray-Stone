@@ -26,7 +26,16 @@ add_executable(nusim src/nusim.cpp)
 # https://robotics.stackexchange.com/questions/23171/creating-a-custom-msg-in-ros2
 ament_target_dependencies(nusim rclcpp std_msgs std_srvs)
 target_link_libraries(nusim ${cpp_typesupport_target})
+install(TARGETS
+  nusim
+  DESTINATION lib/${PROJECT_NAME})
 
+install(DIRECTORY
+  launch
+  # srv # Since this is built, I shouldn't need to install it?
+  config
+  DESTINATION share/${PROJECT_NAME}/
+)
 
 
 if(BUILD_TESTING)
