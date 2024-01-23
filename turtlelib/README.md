@@ -11,11 +11,37 @@ A library for handling transformations in SE(2) and other turtlebot-related math
 1. If you needed to be able to ~normalize~ Vector2D objects (i.e., find the unit vector in the direction of a given Vector2D):
    - Propose three different designs for implementing the ~normalize~ functionality
 
-    1. Finds the manitude of Vector2D `mag = (x+y)/2` Then device each element with it `x/mag ; y/mag` 
+The underlaying math is the same: Finds the manitude of Vector2D `mag = (x+y)/2` Then device each element with it `x/mag ; y/mag`
+
+Option 1:
+```
+Vector2D Vector2D::normalize() const;
+```
+ Create a member function inside Vector2D, which will generate a normalized version of the current Vector2D it's calling from
+
+ Option 2:
+ ```
+ Vector2D normalize(const Vector2D vec);
+ ```
+ Create a free function that takes a source Vector2D, then return a normalized version of it.
+
+ Option 3:
+ ```
+ void Vector2D::normalize();
+ ```
+ Create a member function inside Vector2D, which will do the normalize operation on the object itself by changing its internal x,y value to be normalized.  
 
    - Discuss the pros and cons of each proposed method, in light of the C++ Core Guidelines.
 
+Option 3 have the biggest difference. It's advantage compare to the other two is not returning anything and doing the math in place. However, this is also its disadvantage where user lost the original vector.
+
+Option 1 and 2 are similar. Their advantage is able to be a const function, so not modifying anything, which is closer to the guideline. Their disadvantage is the returning of newly constructed object might involve an extra copy.
+
+Their difference is mainly the namespace. Option 2 might have a disadvantage of extra argument copying. This is not much of a issue right now, but could be more drawback for larger objects (where copy elision for argument can't be applied).
+
    - Which of the methods would you implement and why?
+
+I choose Option 1: const member function that return a normalized vector. It is better not to modify the original object. The drawback of extra copying for return should be easily optimized out by compiler since Vector2D is simple. Also keeping as a member function (instead of free function) making it more obvious that it have strong relationship with Vector2D. 
 
 2. What is the difference between a class and a struct in C++?
 
