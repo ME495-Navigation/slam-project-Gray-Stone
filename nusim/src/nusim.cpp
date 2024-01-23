@@ -1,5 +1,5 @@
 //! @file nu turtlebot simulator
-
+//! @brief Simulator node for turtlebot.
 // Parameters:
 //    rate: int - frequency of simulation timer updates (hz)
 //    x0: double - Initial x position
@@ -297,8 +297,8 @@ private:
       obstacle_marker.scale.x = rad * 2;
       obstacle_marker.scale.y = rad * 2;
       obstacle_marker.scale.z = 0.25;
-      obstacle_marker.pose.position.x = x_s[i];
-      obstacle_marker.pose.position.y = y_s[i];
+      obstacle_marker.pose.position.x = x_s.at(i);
+      obstacle_marker.pose.position.y = y_s.at(i);
       obstacle_marker.pose.position.z = 0.25 / 2;
 
       obstacle_marker.color.r = 1.0;
