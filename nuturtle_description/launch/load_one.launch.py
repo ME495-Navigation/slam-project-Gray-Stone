@@ -1,13 +1,12 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions.declare_launch_argument import DeclareLaunchArgument
-from launch.actions.set_launch_configuration import SetLaunchConfiguration, SomeSubstitutionsType
 from launch.substitutions.command import Command
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.substitutions import ExecutableInPackage
 from launch_ros.descriptions import ParameterValue
 from launch.substitutions.path_join_substitution import PathJoinSubstitution
-from launch.substitutions import EqualsSubstitution, TextSubstitution
+from launch.substitutions import EqualsSubstitution
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 
@@ -17,11 +16,10 @@ def generate_launch_description() -> LaunchDescription:
     return LaunchDescription([
 
         # Arguments
-        DeclareLaunchArgument(
-            name="use_jsp",
-            default_value="true",
-            description=
-            "select weather joint state publisher should be used, true or false. default true"),
+        DeclareLaunchArgument(name="use_jsp",
+                              default_value="true",
+                              description="select weather joint state publisher" +
+                              " should be used, true or false. default true"),
         DeclareLaunchArgument(
             name="use_rviz",
             default_value="true",
