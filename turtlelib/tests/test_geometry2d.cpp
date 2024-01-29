@@ -1,10 +1,14 @@
 #include "turtlelib/geometry2d.hpp"
 
+#include <random>
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators_adapters.hpp>
 #include <catch2/generators/catch_generators_random.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
+
+#include <catch2/matchers/catch_matchers_templated.hpp>
 
 #include <sstream>
 namespace turtlelib {
@@ -135,4 +139,112 @@ TEST_CASE("Point + Vector") {
   REQUIRE_THAT(result.x, WithinRel(11.0));
   REQUIRE_THAT(result.y, WithinRel(7.0));
 }
+
+struct Vector2DWithinRel : Catch::Matchers::MatcherGenericBase {
+    Vector2DWithinRel(Vector2D const& target_vec , double rel =std::numeric_limits<double>::epsilon() * 100):
+        vec{ target_vec }, rel{rel}
+    {}
+
+    bool match (Vector2D const& in) const {
+      if (! WithinRel(vec.x,rel).match(in.x)) {
+        return false;
+      }
+      if (! WithinRel(vec.y,rel).match(in.y)) {
+        return false;
+      }
+      return true;
+    }
+
+    std::string describe() const {
+      std::ostringstream os;
+      os << "and " << vec << " are within " << rel << " of each other";
+      return os.str();
+    }
+
+    Vector2D vec;
+    double rel;
+};
+
+
+TEST_CASE("Vector Vector math", "[Vector2D],[TaskB8]") {
+
+  SECTION("Vector add sub"){
+    REQUIRE(Vector2D{1.0,2.0} + Vector2D{3.0,0.5}  == Vector2D{4.0,2.5});
+    REQUIRE(Vector2D{1.0,2.0} - Vector2D{3.0,0.5}  == Vector2D{-2.0,1.5});
+
+    Vector2D v1{-0.1 , 0.5};
+    Vector2D v2 = v1;
+    v1 += Vector2D{0.2 , -0.1};
+    v2 -= Vector2D{0.2 , -0.1};
+
+    REQUIRE(v1 == Vector2D{0.1 , 0.4});
+    // This check can't be using simple equal. -0.3 is a number that actually is
+    // not accurate in float, thus need the extra eps. hance the custom matcher
+    REQUIRE_THAT(v2, Vector2DWithinRel(Vector2D{-0.3, 0.6}));
+  }
+
+  SECTION("Vector scaling") {
+    double base_x = GENERATE(
+        Catch::Generators::take(20, Catch::Generators::random(-1e10, 1e10)));
+    double base_y = GENERATE(
+        Catch::Generators::take(20, Catch::Generators::random(-1e10, 1e10)));
+    double scale = GENERATE(
+        Catch::Generators::take(20, Catch::Generators::random(-1e10, 1e10)));
+    // The positive and negative is split because the 
+    Vector2D base_vec{base_x, base_y};
+    Vector2D scaled_vec = base_vec * scale;
+
+    INFO("vec " << base_vec);
+    INFO("scale " << scale);
+    INFO("scaled vec "<< scaled_vec);
+    INFO("scale abs " << std::abs(scale));
+    REQUIRE_THAT(scaled_vec.magnitude() ,
+                 WithinRel(base_vec.magnitude() * std::abs(scale) , 1e-10));
+    // This is more of a direction check. see if negative scale flip sign.
+    REQUIRE_THAT( scaled_vec.normalize().x,
+                 WithinRel(base_vec.normalize().x * std::copysign(1.0,scale), 1e-10));
+
+    // Another form of multiply
+    Vector2D self_inc_vec = base_vec;
+    self_inc_vec *= scale;
+    INFO("self_inc_vec " << self_inc_vec);
+
+    REQUIRE_THAT(self_inc_vec.magnitude(),
+                 WithinRel(base_vec.magnitude() * std::abs(scale), 1e-10));
+    // This is more of a direction check. see if negative scale flip sign.
+    REQUIRE_THAT(
+        self_inc_vec.normalize().x,
+        WithinRel(base_vec.normalize().x * std::copysign(1.0, scale), 1e-10));
+  }
+
+  SECTION("Vector dot"){
+    // TODO
+  }
+
+  auto x_axis = Vector2D{1.0, 0.0};
+    // https://en.cppreference.com/w/cpp/numeric/random/uniform_real_distribution
+  std::random_device
+      rd; // Will be used to obtain a seed for the random number engine
+  std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+  std::uniform_real_distribution<> dis(0.2, 1e6);
+
+  SECTION("Vector angle") {
+    // Point into right. basically the X axis.
+    auto base_ang = GENERATE(
+        Catch::Generators::take(20, Catch::Generators::random(-PI, PI)));
+    auto flat_x = x_axis * dis(gen);
+
+    auto v1 = Vector2D{cos(base_ang), sin(base_ang)} * dis(gen);
+    REQUIRE_THAT(angle(flat_x, v1), WithinRel(base_ang, 1e-5));
+
+    auto given_ang = GENERATE(Catch::Generators::take(
+        50, Catch::Generators::random(-PI * 20, PI * 20)));
+    auto normalized_given_ang = normalize_angle(given_ang);
+    // The vector
+    auto v2 = Vector2D{cos(given_ang + base_ang), sin(given_ang + base_ang)};
+
+    REQUIRE_THAT(angle(v1, v2), WithinRel(normalized_given_ang, 1e-5));
+  }
+}
+
 } // namespace turtlelib
