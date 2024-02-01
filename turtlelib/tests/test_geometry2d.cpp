@@ -26,7 +26,7 @@ TEST_CASE("Normalizing angles") {
   REQUIRE_THAT(normalize_angle(3 * PI / 2), WithinRel(-PI / 2));
   REQUIRE_THAT(normalize_angle(-5 * PI / 2), WithinRel(-PI / 2));
 
-  constexpr double rad_step_size = 1e-4;
+  constexpr double rad_step_size = 1e-5;
 
   // NOT using generator range, because the huge number of iterations
   // range generator is actually a lot a lot slower then double for loop.
@@ -179,15 +179,17 @@ struct Vector2DWithinRel : Catch::Matchers::MatcherGenericBase {
 TEST_CASE("Vector Vector math", "[Vector2D],[TaskB8]") {
 
   SECTION("Vector add sub") {
-    REQUIRE(Vector2D{1.0, 2.0} + Vector2D{3.0, 0.5} == Vector2D{4.0, 2.5});
-    REQUIRE(Vector2D{1.0, 2.0} - Vector2D{3.0, 0.5} == Vector2D{-2.0, 1.5});
+    REQUIRE_THAT((Vector2D{1.0, 2.0} + Vector2D{3.0, 0.5}),
+                 Vector2DWithinRel(Vector2D{4.0, 2.5}));
+    REQUIRE_THAT((Vector2D{1.0, 2.0} - Vector2D{3.0, 0.5}),
+                 Vector2DWithinRel(Vector2D{-2.0, 1.5}));
 
     Vector2D v1{-0.1, 0.5};
     Vector2D v2 = v1;
     v1 += Vector2D{0.2, -0.1};
     v2 -= Vector2D{0.2, -0.1};
 
-    REQUIRE(v1 == Vector2D{0.1, 0.4});
+    REQUIRE_THAT(v1 , Vector2DWithinRel( Vector2D{0.1, 0.4}));
     // This check can't be using simple equal. -0.3 is a number that actually is
     // not accurate in float, thus need the extra eps. hance the custom matcher
     REQUIRE_THAT(v2, Vector2DWithinRel(Vector2D{-0.3, 0.6}));

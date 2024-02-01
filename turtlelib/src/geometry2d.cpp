@@ -61,17 +61,6 @@ std::istream &operator>>(std::istream &is, Vector2D &v) {
   return is;
 }
 
-bool operator==(const Vector2D &lhs, const Vector2D &rhs) {
-  if (lhs.x != rhs.x){
-    return false;
-  } 
-  if (lhs.y != rhs.y){
-    return false;
-  } 
-  
-    return true;
-}
-
 Vector2D &Vector2D::operator+=(const Vector2D &rhs) {
   x += rhs.x;
   y += rhs.y;

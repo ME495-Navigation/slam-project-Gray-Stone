@@ -80,12 +80,27 @@ struct Vector2D {
   /// \brief the y coordinate
   double y = 0.0;
 
+  //! @brief get the normalized version of this vector
+  //! @return a Vector2D that is normalized
   Vector2D normalize() const;
 
+  //! @brief get the magnitude of this vector
+  //! @return magnitude in double
   double magnitude() const;
 
+  //! @brief Self increment operator, add current vector by given vector
+  //! @param rhs Vector to add to the back
+  //! @return This vector itself.
   Vector2D &operator+=(const Vector2D &rhs);
+
+  //! @brief Self decrement operator, subtract current vector by given vector
+  //! @param rhs Vector to subtract to the back
+  //! @return This vector itself.
   Vector2D &operator-=(const Vector2D &rhs);
+  
+  //! @brief scale this vector by a scaler.
+  //! @param rhs scaler to scale the vector.
+  //! @return This vector itself.
   Vector2D &operator*=(const double &rhs);
 };
 
@@ -131,16 +146,41 @@ std::ostream &operator<<(std::ostream &os, const Vector2D &v);
 /// it get removes the next unprocessed character from the buffer.
 std::istream &operator>>(std::istream &is, Vector2D &v);
 
-
-bool operator==(const Vector2D &lhs, const Vector2D &rhs);
-
+//! @brief Add two vector together.
+//! @param lhs Vector 1
+//! @param rhs Vector 2
+//! @return sum of two vector
 Vector2D operator+(const Vector2D &lhs, const Vector2D &rhs);
+
+//! @brief Sub track two vector
+//! @param lhs Vector in front
+//! @param rhs Vector in back
+//! @return result of subtraction
 Vector2D operator-(const Vector2D &lhs, const Vector2D &rhs);
+
+//! @brief scale the vector by a scaler
+//! @param lhs the scaler
+//! @param rhs the vector 
+//! @return scaled vector
 Vector2D operator*(const double &lhs, const Vector2D &rhs);
+
+//! @brief scale the vector by a scaler
+//! @param lhs the vector
+//! @param rhs the scaler
+//! @return scaled vector
 Vector2D operator*(const Vector2D &lhs, const double &rhs);
 
+//! @brief dot product of two vector.
+//! @param v1 first vector
+//! @param v2 second vector
+//! @return dot product between two inputs
 double dot(const Vector2D& v1, const Vector2D& v2);
 
+//! @brief Get the directional angle from vector 1 to vector 2
+//! @param v1 Starting vector
+//! @param v2 Ending vector
+//! @return Angle from starting vector to ending vector. output is from atan2
+//! (signed, within -PI PI)
 double angle(const Vector2D &v1, const Vector2D &v2);
 
 } // namespace turtlelib
