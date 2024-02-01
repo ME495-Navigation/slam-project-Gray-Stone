@@ -116,19 +116,15 @@ double dot(const Vector2D& v1, const Vector2D& v2){
   return v1.x * v2.x + v1.y * v2.y;
 }
 
-double Determinant(const Vector2D& v1, const Vector2D& v2){
-  return v1.x*v2.y - v1.y * v2.x ; 
-}
 
 double angle(const Vector2D &v1, const Vector2D &v2){
 
-// https://stackoverflow.com/questions/21483999/using-atan2-to-find-angle-between-two-vectors
-
-
+  // Citation ----------[4]---------- 
   //     dot = x1*x2 + y1*y2      # Dot product between [x1, y1] and [x2, y2]
   // det = x1*y2 - y1*x2      # Determinant
+  double det = v1.x*v2.y - v1.y * v2.x ;
   // angle = atan2(det, dot)  # atan2(y, x) or atan2(sin, cos)
-  return atan2(Determinant(v1, v2), dot(v1, v2));
+  return atan2( det , dot(v1, v2));
 }
 
 } // namespace turtlelib

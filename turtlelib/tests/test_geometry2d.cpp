@@ -5,17 +5,18 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators_adapters.hpp>
 #include <catch2/generators/catch_generators_random.hpp>
+
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 #include <catch2/matchers/catch_matchers_templated.hpp>
-
 #include <sstream>
 namespace turtlelib {
 
 using Catch::Matchers::Equals;
 using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
+
 TEST_CASE("Normalizing angles") {
   // double base_angle = 3* PI /2;
   REQUIRE_THAT(normalize_angle(PI), WithinRel(PI));
@@ -24,7 +25,11 @@ TEST_CASE("Normalizing angles") {
   REQUIRE_THAT(normalize_angle(-PI / 4), WithinRel(-PI / 4));
   REQUIRE_THAT(normalize_angle(3 * PI / 2), WithinRel(-PI / 2));
   REQUIRE_THAT(normalize_angle(-5 * PI / 2), WithinRel(-PI / 2));
-  double rad_step_size = 1e-6;
+
+  constexpr double rad_step_size = 1e-4;
+
+  // NOT using generator range, because the huge number of iterations
+  // range generator is actually a lot a lot slower then double for loop.
   for (int circle_count = -4; circle_count < 4; ++circle_count) {
     // Sweep all angles within -PI to PI
     for (double base_angle = -PI + rad_step_size; base_angle < PI;
@@ -140,44 +145,49 @@ TEST_CASE("Point + Vector") {
   REQUIRE_THAT(result.y, WithinRel(7.0));
 }
 
+////==================================== 
+////==================================== 
+////       Vector2D tests
+////==================================== 
+////==================================== 
+
 struct Vector2DWithinRel : Catch::Matchers::MatcherGenericBase {
-    Vector2DWithinRel(Vector2D const& target_vec , double rel =std::numeric_limits<double>::epsilon() * 100):
-        vec{ target_vec }, rel{rel}
-    {}
+  Vector2DWithinRel(Vector2D const &target_vec,
+                    double rel = std::numeric_limits<double>::epsilon() * 100)
+      : vec{target_vec}, rel{rel} {}
 
-    bool match (Vector2D const& in) const {
-      if (! WithinRel(vec.x,rel).match(in.x)) {
-        return false;
-      }
-      if (! WithinRel(vec.y,rel).match(in.y)) {
-        return false;
-      }
-      return true;
+  bool match(Vector2D const &in) const {
+    if (!WithinRel(vec.x, rel).match(in.x)) {
+      return false;
     }
-
-    std::string describe() const {
-      std::ostringstream os;
-      os << "and " << vec << " are within " << rel << " of each other";
-      return os.str();
+    if (!WithinRel(vec.y, rel).match(in.y)) {
+      return false;
     }
+    return true;
+  }
 
-    Vector2D vec;
-    double rel;
+  std::string describe() const {
+    std::ostringstream os;
+    os << "and " << vec << " are within " << rel << " of each other";
+    return os.str();
+  }
+
+  Vector2D vec;
+  double rel;
 };
-
 
 TEST_CASE("Vector Vector math", "[Vector2D],[TaskB8]") {
 
-  SECTION("Vector add sub"){
-    REQUIRE(Vector2D{1.0,2.0} + Vector2D{3.0,0.5}  == Vector2D{4.0,2.5});
-    REQUIRE(Vector2D{1.0,2.0} - Vector2D{3.0,0.5}  == Vector2D{-2.0,1.5});
+  SECTION("Vector add sub") {
+    REQUIRE(Vector2D{1.0, 2.0} + Vector2D{3.0, 0.5} == Vector2D{4.0, 2.5});
+    REQUIRE(Vector2D{1.0, 2.0} - Vector2D{3.0, 0.5} == Vector2D{-2.0, 1.5});
 
-    Vector2D v1{-0.1 , 0.5};
+    Vector2D v1{-0.1, 0.5};
     Vector2D v2 = v1;
-    v1 += Vector2D{0.2 , -0.1};
-    v2 -= Vector2D{0.2 , -0.1};
+    v1 += Vector2D{0.2, -0.1};
+    v2 -= Vector2D{0.2, -0.1};
 
-    REQUIRE(v1 == Vector2D{0.1 , 0.4});
+    REQUIRE(v1 == Vector2D{0.1, 0.4});
     // This check can't be using simple equal. -0.3 is a number that actually is
     // not accurate in float, thus need the extra eps. hance the custom matcher
     REQUIRE_THAT(v2, Vector2DWithinRel(Vector2D{-0.3, 0.6}));
@@ -190,19 +200,20 @@ TEST_CASE("Vector Vector math", "[Vector2D],[TaskB8]") {
         Catch::Generators::take(20, Catch::Generators::random(-1e10, 1e10)));
     double scale = GENERATE(
         Catch::Generators::take(20, Catch::Generators::random(-1e10, 1e10)));
-    // The positive and negative is split because the 
+    // The positive and negative is split because the
     Vector2D base_vec{base_x, base_y};
     Vector2D scaled_vec = base_vec * scale;
 
     INFO("vec " << base_vec);
     INFO("scale " << scale);
-    INFO("scaled vec "<< scaled_vec);
+    INFO("scaled vec " << scaled_vec);
     INFO("scale abs " << std::abs(scale));
-    REQUIRE_THAT(scaled_vec.magnitude() ,
-                 WithinRel(base_vec.magnitude() * std::abs(scale) , 1e-10));
+    REQUIRE_THAT(scaled_vec.magnitude(),
+                 WithinRel(base_vec.magnitude() * std::abs(scale), 1e-10));
     // This is more of a direction check. see if negative scale flip sign.
-    REQUIRE_THAT( scaled_vec.normalize().x,
-                 WithinRel(base_vec.normalize().x * std::copysign(1.0,scale), 1e-10));
+    REQUIRE_THAT(
+        scaled_vec.normalize().x,
+        WithinRel(base_vec.normalize().x * std::copysign(1.0, scale), 1e-10));
 
     // Another form of multiply
     Vector2D self_inc_vec = base_vec;
@@ -217,14 +228,17 @@ TEST_CASE("Vector Vector math", "[Vector2D],[TaskB8]") {
         WithinRel(base_vec.normalize().x * std::copysign(1.0, scale), 1e-10));
   }
 
-  SECTION("Vector dot"){
-    // TODO
+  SECTION("Vector dot") {
+    // I didn't find good way of doing dot product, so just try a few value
+    REQUIRE_THAT(dot({1.0, 2.0}, {3.0, 4.0}), WithinRel(11.0));
+    REQUIRE_THAT(dot({0.1, 2.0}, {3.0, 1.5}), WithinRel(3.3));
+    REQUIRE_THAT(dot({100.0, 500.0}, {10.0, 0.1}), WithinRel(1050.0));
+    REQUIRE_THAT(dot({100.0, 0.0}, {0.0, 0.1}), WithinRel(0.0));
   }
 
   auto x_axis = Vector2D{1.0, 0.0};
-    // https://en.cppreference.com/w/cpp/numeric/random/uniform_real_distribution
-  std::random_device
-      rd; // Will be used to obtain a seed for the random number engine
+  // https://en.cppreference.com/w/cpp/numeric/random/uniform_real_distribution
+  std::random_device rd;
   std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
   std::uniform_real_distribution<> dis(0.2, 1e6);
 
