@@ -1,5 +1,5 @@
 #include "turtlelib/test_utils.hpp"
-
+#include <sstream>
 namespace turtlelib {
 
 Vector2DWithinRel::Vector2DWithinRel(Vector2D const &target_vec, double rel)

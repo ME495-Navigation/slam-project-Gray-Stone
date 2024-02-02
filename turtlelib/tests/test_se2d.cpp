@@ -6,6 +6,7 @@
 #include <catch2/generators/catch_generators_adapters.hpp>
 #include <catch2/generators/catch_generators_random.hpp>
 #include <catch2/generators/catch_generators_range.hpp>
+#include <catch2/matchers/catch_matchers.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <catch2/matchers/catch_matchers_templated.hpp>
@@ -133,11 +134,24 @@ TEST_CASE("Twist integrate", "[Twist]") {
 
   // Init pose
   SECTION("Translate only") {
-    REQUIRE_THAT(integrate_twist(Twist2D{0, 10.1, 2.2}),
-                 Transform2DWithinRel({{10.1, 2.2}, 0.0}));
+    double x_trans = GENERATE(
+        Catch::Generators::take(20, Catch::Generators::random(-1e3, 1e3)));
+    double y_trans = GENERATE(
+        Catch::Generators::take(20, Catch::Generators::random(-1e3, 1e3)));
+
+    REQUIRE_THAT(integrate_twist(Twist2D{0, x_trans, y_trans}),
+                 Transform2DWithinRel({{x_trans, y_trans}, 0.0}));
   }
 
-  SECTION("Y twist") {
+  SECTION("Pure rotation") {
+    double rot_ang = GENERATE(
+        Catch::Generators::take(3, Catch::Generators::random(-PI, PI)));
+
+    REQUIRE_THAT(integrate_twist(Twist2D{rot_ang}),
+                 Transform2DWithinRel(Transform2D(rot_ang)));
+  }
+
+  SECTION("Y-dir arc twist") {
 
     //         b'x
     //       ▲
@@ -157,18 +171,6 @@ TEST_CASE("Twist integrate", "[Twist]") {
     REQUIRE_THAT(integrate_twist(twist),
                  Transform2DWithinRel({{-2.0, 2.0}, PI / 2}));
   }
-  // clang-off
-  //     b'x
-  //       ▲
-  // b'y   │
-  //   ◄───┘      Twist( (0,2),90)
-  //     (-1,2)
-
-  //                    by
-  //             sy    ▲
-  //       │     ▲  sx │   bx
-  //       └──   └─►   └──►
-  //     (-1,0)        (1,0)
 }
 
 // The following are imported tests from Srikanth.

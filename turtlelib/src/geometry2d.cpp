@@ -1,6 +1,5 @@
 #include "turtlelib/geometry2d.hpp"
 #include <iostream>
-#include <string>
 
 namespace turtlelib {
 
@@ -31,9 +30,7 @@ Vector2D Vector2D::normalize() const {
   return {x / norm, y / norm};
 }
 
-double Vector2D::magnitude() const{
-    return sqrt(x*x + y*y);
-}
+double Vector2D::magnitude() const { return sqrt(x * x + y * y); }
 
 Vector2D operator-(const Point2D &head, const Point2D &tail) {
   return {head.x - tail.x, head.y - tail.y};
@@ -101,20 +98,18 @@ Vector2D operator*(const Vector2D &lhs, const double &rhs) {
 }
 Vector2D operator*(const double &lhs, const Vector2D &rhs) { return rhs * lhs; }
 
-double dot(const Vector2D& v1, const Vector2D& v2){
+double dot(const Vector2D &v1, const Vector2D &v2) {
   return v1.x * v2.x + v1.y * v2.y;
 }
 
+double angle(const Vector2D &v1, const Vector2D &v2) {
 
-double angle(const Vector2D &v1, const Vector2D &v2){
-
-  // Citation ----------[4]---------- 
+  // Citation ----------[4]----------
   //     dot = x1*x2 + y1*y2      # Dot product between [x1, y1] and [x2, y2]
   // det = x1*y2 - y1*x2      # Determinant
-  double det = v1.x*v2.y - v1.y * v2.x ;
+  double det = v1.x * v2.y - v1.y * v2.x;
   // angle = atan2(det, dot)  # atan2(y, x) or atan2(sin, cos)
-  return atan2( det , dot(v1, v2));
+  return atan2(det, dot(v1, v2));
 }
-
 
 } // namespace turtlelib

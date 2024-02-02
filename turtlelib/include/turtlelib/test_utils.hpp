@@ -8,8 +8,6 @@
 #include "turtlelib/se2d.hpp"
 #include <catch2/matchers/catch_matchers_templated.hpp>
 
-#include <sstream>
-
 using Catch::Matchers::WithinRel;
 
 namespace turtlelib {

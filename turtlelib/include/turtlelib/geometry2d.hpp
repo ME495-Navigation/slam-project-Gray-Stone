@@ -97,7 +97,7 @@ struct Vector2D {
   //! @param rhs Vector to subtract to the back
   //! @return This vector itself.
   Vector2D &operator-=(const Vector2D &rhs);
-  
+
   //! @brief scale this vector by a scaler.
   //! @param rhs scaler to scale the vector.
   //! @return This vector itself.
@@ -160,7 +160,7 @@ Vector2D operator-(const Vector2D &lhs, const Vector2D &rhs);
 
 //! @brief scale the vector by a scaler
 //! @param lhs the scaler
-//! @param rhs the vector 
+//! @param rhs the vector
 //! @return scaled vector
 Vector2D operator*(const double &lhs, const Vector2D &rhs);
 
@@ -174,7 +174,7 @@ Vector2D operator*(const Vector2D &lhs, const double &rhs);
 //! @param v1 first vector
 //! @param v2 second vector
 //! @return dot product between two inputs
-double dot(const Vector2D& v1, const Vector2D& v2);
+double dot(const Vector2D &v1, const Vector2D &v2);
 
 //! @brief Get the directional angle from vector 1 to vector 2
 //! @param v1 Starting vector
@@ -185,11 +185,11 @@ double angle(const Vector2D &v1, const Vector2D &v2);
 
 constexpr bool almost_equal(const Vector2D &v1, const Vector2D &v2,
                             double epsilon = 1.0e-12) {
-  if (! almost_equal(v1.x, v2.x, epsilon)) {
+  if (!almost_equal(v1.x, v2.x, epsilon)) {
     return false;
   }
 
-  if (! almost_equal(v1.y , v2.y , epsilon)) {
+  if (!almost_equal(v1.y, v2.y, epsilon)) {
     return false;
   }
   return true;

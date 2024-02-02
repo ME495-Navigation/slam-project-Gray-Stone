@@ -98,40 +98,31 @@ bool almost_equal(const Transform2D &tf1, const Transform2D &tf2,
   return true;
 }
 
-Transform2D integrate_twist(Twist2D twist){
-if (almost_equal(twist.omega ,0)){
-  return Transform2D(Vector2D{twist.x,twist.y});
+Transform2D integrate_twist(Twist2D twist) {
+  if (almost_equal(twist.omega, 0)) {
+    return Transform2D(Vector2D{twist.x, twist.y});
+  }
+
+  // {b} is original body frame.
+  // {s} is CoR frame
+
+  // Find center of rotation CoR from twist:
+  Vector2D p_sb{twist.y / twist.omega, -twist.x / twist.omega};
+
+  // Rotate this CoR frame by omega, which is Tbs'
+  Transform2D Tbs = Transform2D{p_sb}.inv();
+
+  // Transform2D Tbs_prime{p_sb,twist.omega};
+  Transform2D Tss_prime{twist.omega};
+
+  // Ts'b' = Tb's' ^ -1
+  // Transform2D Ts_primt_b_primt = Transform2D{p_sb};
+  Transform2D Ts_primt_b_primt = Tbs.inv();
+
+  // Tbb' = Tbs' * Ts'b'
+  // return Tbs_prime * Ts_primt_b_primt ;
+  return Tbs * Tss_prime * Ts_primt_b_primt;
 }
-
-// {b} is original body frame. 
-// {s} is CoR frame
-
-std::cout<< "twist" << twist << "\n";
-
-// Find center of rotation CoR from twist:
-Vector2D p_sb { twist.y/twist.omega , -twist.x / twist.omega };
-
-std::cout<< "p_sb" << p_sb << "\n";
-// Rotate this CoR frame by omega, which is Tbs'
-Transform2D Tbs = Transform2D{p_sb}.inv();
-std::cout<< "Tbs" << Tbs << "\n";
-
-// Transform2D Tbs_prime{p_sb,twist.omega};
-Transform2D Tss_prime {twist.omega};
-std::cout<< "Tss'" << Tss_prime << "\n";
-
-// Ts'b' = Tb's' ^ -1
-// Transform2D Ts_primt_b_primt = Transform2D{p_sb};
-Transform2D Ts_primt_b_primt = Tbs.inv();
-
-std::cout<< "Ts'b'" << Ts_primt_b_primt << "\n";
-
-// Tbb' = Tbs' * Ts'b'
-// return Tbs_prime * Ts_primt_b_primt ;
-return Tbs * Tss_prime * Ts_primt_b_primt ;
-}
-
-
 
 std::ostream &operator<<(std::ostream &os, const Transform2D &tf) {
   os << "deg: " << rad2deg(tf.rotation()) << " x: " << tf.x << " y: " << tf.y;
@@ -165,8 +156,5 @@ Transform2D operator*(Transform2D lhs, const Transform2D &rhs) {
   double new_ang = lhs.rotation() + rhs.rotation();
   return {{new_p.x, new_p.y}, new_ang};
 }
-
-
-
 
 } // namespace turtlelib

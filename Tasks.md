@@ -18,6 +18,7 @@ Task B
 * Task B.6 done 
 * Task B.7 done
 * Task B.8 done 
+* Task B.9 done 
 
 Task C
 * Task C.1 done
