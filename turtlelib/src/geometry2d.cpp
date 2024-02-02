@@ -116,4 +116,5 @@ double angle(const Vector2D &v1, const Vector2D &v2){
   return atan2( det , dot(v1, v2));
 }
 
+
 } // namespace turtlelib

@@ -183,6 +183,24 @@ double dot(const Vector2D& v1, const Vector2D& v2);
 //! (signed, within -PI PI)
 double angle(const Vector2D &v1, const Vector2D &v2);
 
+constexpr bool almost_equal(const Vector2D &v1, const Vector2D &v2,
+                            double epsilon = 1.0e-12) {
+  if (! almost_equal(v1.x, v2.x, epsilon)) {
+    return false;
+  }
+
+  if (! almost_equal(v1.y , v2.y , epsilon)) {
+    return false;
+  }
+  return true;
+}
+
+static_assert(almost_equal(Vector2D{3.0, 1.0}, Vector2D{3.0, 1.0}),
+              "Vector almost_equal failed");
+
+// bool almost_equal(const Vector2D &v1, const Vector2D &v2,
+//                   double epsilon = std::numeric_limits<double>::epsilon() *
+//                                    100);
 } // namespace turtlelib
 
 #endif

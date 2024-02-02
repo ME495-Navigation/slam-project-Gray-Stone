@@ -3,6 +3,7 @@
 #include <sstream>
 
 #include <cmath>
+#include <iostream>
 
 namespace turtlelib {
 std::ostream &operator<<(std::ostream &os, const Twist2D &tw) {
@@ -68,7 +69,6 @@ Transform2D Transform2D::inv() const {
 }
 
 Transform2D &Transform2D::operator*=(const Transform2D &rhs) {
-
   // This is source of me math
   // https://www.symbolab.com/solver/step-by-step/%5Cbegin%7Bpmatrix%7Dc_%7Bt%7D%26-s_%7Bt%7D%26x%5C%5C%20%20%20%20s_%7Bt%7D%26c_%7Bt%7D%26y%5C%5C%20%20%20%200%260%261%5Cend%7Bpmatrix%7D%5Ccdot%5Cbegin%7Bpmatrix%7Dc_%7B2%7D%26-s_%7B2%7D%26x_%7B2%7D%5C%5C%20%20%20%20%20s_%7B2%7D%26c_%7B2%7D%26y_%7B2%7D%5C%5C%20%20%20%20%200%260%261%5Cend%7Bpmatrix%7D?or=input
   Point2D p_rhs{rhs.x, rhs.y};
@@ -86,6 +86,52 @@ Transform2D &Transform2D::operator*=(const Transform2D &rhs) {
 Vector2D Transform2D::translation() const { return {x, y}; }
 
 double Transform2D::rotation() const { return atan2(sin_t, cos_t); }
+
+bool almost_equal(const Transform2D &tf1, const Transform2D &tf2,
+                  double epsilon) {
+  if (!almost_equal(tf1.translation(), tf2.translation(), epsilon)) {
+    return false;
+  }
+  if (!almost_equal(tf1.rotation(), tf2.rotation(), epsilon)) {
+    return false;
+  }
+  return true;
+}
+
+Transform2D integrate_twist(Twist2D twist){
+if (almost_equal(twist.omega ,0)){
+  return Transform2D(Vector2D{twist.x,twist.y});
+}
+
+// {b} is original body frame. 
+// {s} is CoR frame
+
+std::cout<< "twist" << twist << "\n";
+
+// Find center of rotation CoR from twist:
+Vector2D p_sb { twist.y/twist.omega , -twist.x / twist.omega };
+
+std::cout<< "p_sb" << p_sb << "\n";
+// Rotate this CoR frame by omega, which is Tbs'
+Transform2D Tbs = Transform2D{p_sb}.inv();
+std::cout<< "Tbs" << Tbs << "\n";
+
+// Transform2D Tbs_prime{p_sb,twist.omega};
+Transform2D Tss_prime {twist.omega};
+std::cout<< "Tss'" << Tss_prime << "\n";
+
+// Ts'b' = Tb's' ^ -1
+// Transform2D Ts_primt_b_primt = Transform2D{p_sb};
+Transform2D Ts_primt_b_primt = Tbs.inv();
+
+std::cout<< "Ts'b'" << Ts_primt_b_primt << "\n";
+
+// Tbb' = Tbs' * Ts'b'
+// return Tbs_prime * Ts_primt_b_primt ;
+return Tbs * Tss_prime * Ts_primt_b_primt ;
+}
+
+
 
 std::ostream &operator<<(std::ostream &os, const Transform2D &tf) {
   os << "deg: " << rad2deg(tf.rotation()) << " x: " << tf.x << " y: " << tf.y;
@@ -119,5 +165,8 @@ Transform2D operator*(Transform2D lhs, const Transform2D &rhs) {
   double new_ang = lhs.rotation() + rhs.rotation();
   return {{new_p.x, new_p.y}, new_ang};
 }
+
+
+
 
 } // namespace turtlelib

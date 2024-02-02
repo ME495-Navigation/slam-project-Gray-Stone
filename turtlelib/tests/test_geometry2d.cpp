@@ -3,13 +3,12 @@
 #include <random>
 
 #include <catch2/catch_test_macros.hpp>
-#include <catch2/generators/catch_generators_adapters.hpp>
 #include <catch2/generators/catch_generators_random.hpp>
-
+#include "turtlelib/test_utils.hpp"
+#include <catch2/generators/catch_generators_adapters.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
-#include <catch2/matchers/catch_matchers_templated.hpp>
 #include <sstream>
 namespace turtlelib {
 
@@ -150,31 +149,6 @@ TEST_CASE("Point + Vector") {
 ////       Vector2D tests
 ////==================================== 
 ////==================================== 
-
-struct Vector2DWithinRel : Catch::Matchers::MatcherGenericBase {
-  Vector2DWithinRel(Vector2D const &target_vec,
-                    double rel = std::numeric_limits<double>::epsilon() * 100)
-      : vec{target_vec}, rel{rel} {}
-
-  bool match(Vector2D const &in) const {
-    if (!WithinRel(vec.x, rel).match(in.x)) {
-      return false;
-    }
-    if (!WithinRel(vec.y, rel).match(in.y)) {
-      return false;
-    }
-    return true;
-  }
-
-  std::string describe() const {
-    std::ostringstream os;
-    os << "and " << vec << " are within " << rel << " of each other";
-    return os.str();
-  }
-
-  Vector2D vec;
-  double rel;
-};
 
 TEST_CASE("Vector Vector math", "[Vector2D],[TaskB8]") {
 

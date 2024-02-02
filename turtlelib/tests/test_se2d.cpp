@@ -1,5 +1,6 @@
 #include "turtlelib/se2d.hpp"
 
+#include "turtlelib/test_utils.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/generators/catch_generators_adapters.hpp>
@@ -7,7 +8,7 @@
 #include <catch2/generators/catch_generators_range.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
-
+#include <catch2/matchers/catch_matchers_templated.hpp>
 #include <sstream>
 
 using Catch::Matchers::Equals;
@@ -47,20 +48,20 @@ TEST_CASE("Twist 2d stream test", "[Twist2D]") {
     REQUIRE_THAT(out_twist.omega, WithinRel(twist_a.omega));
     REQUIRE_THAT(out_twist.x, WithinRel(twist_a.x));
     REQUIRE_THAT(out_twist.y, WithinRel(twist_a.y));
-  SECTION("InStream2"){
-    ss.str("1203.9 -10   20.12345");
-    ss >> out_twist;
-    REQUIRE_THAT(out_twist.omega, WithinRel(1203.9));
-    REQUIRE_THAT(out_twist.x, WithinRel(-10.0f));
-    REQUIRE_THAT(out_twist.y, WithinRel(20.12345));
-  }
-  SECTION("Instream3"){
-    ss.str("1 1 1");
-    ss >> out_twist;
-    REQUIRE_THAT(out_twist.omega, WithinRel(1.0));
-    REQUIRE_THAT(out_twist.x, WithinRel(1.0));
-    REQUIRE_THAT(out_twist.y, WithinRel(1.0));
-  }
+    SECTION("InStream2") {
+      ss.str("1203.9 -10   20.12345");
+      ss >> out_twist;
+      REQUIRE_THAT(out_twist.omega, WithinRel(1203.9));
+      REQUIRE_THAT(out_twist.x, WithinRel(-10.0f));
+      REQUIRE_THAT(out_twist.y, WithinRel(20.12345));
+    }
+    SECTION("Instream3") {
+      ss.str("1 1 1");
+      ss >> out_twist;
+      REQUIRE_THAT(out_twist.omega, WithinRel(1.0));
+      REQUIRE_THAT(out_twist.x, WithinRel(1.0));
+      REQUIRE_THAT(out_twist.y, WithinRel(1.0));
+    }
   }
 }
 
@@ -126,6 +127,48 @@ TEST_CASE("Transform 2d stream test", "[Twist2D]") {
     REQUIRE_THAT(tf.translation().x, WithinRel(22.5));
     REQUIRE_THAT(tf.translation().y, WithinRel(80.8));
   }
+}
+
+TEST_CASE("Twist integrate", "[Twist]") {
+
+  // Init pose
+  SECTION("Translate only") {
+    REQUIRE_THAT(integrate_twist(Twist2D{0, 10.1, 2.2}),
+                 Transform2DWithinRel({{10.1, 2.2}, 0.0}));
+  }
+
+  SECTION("Y twist") {
+
+    //         b'x
+    //       ▲
+    // b'y   │
+    //   ◄───┘      Screw( xy=(0,2),rot=90)
+    //     (-2,2)
+
+    //                    by
+    //                   ▲
+    //       │           │   bx
+    //       └──         └──►
+    //     (-2,0)        (0,0)
+
+    // For screw, the thing is normalized with omega=1. So to generate a twist
+    // Needs to multiply by rotation amount.
+    Twist2D twist{1.0 * PI / 2, 0.0, 2.0 * PI / 2};
+    REQUIRE_THAT(integrate_twist(twist),
+                 Transform2DWithinRel({{-2.0, 2.0}, PI / 2}));
+  }
+  // clang-off
+  //     b'x
+  //       ▲
+  // b'y   │
+  //   ◄───┘      Twist( (0,2),90)
+  //     (-1,2)
+
+  //                    by
+  //             sy    ▲
+  //       │     ▲  sx │   bx
+  //       └──   └─►   └──►
+  //     (-1,0)        (1,0)
 }
 
 // The following are imported tests from Srikanth.
