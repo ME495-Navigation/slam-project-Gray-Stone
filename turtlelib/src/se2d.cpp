@@ -102,7 +102,7 @@ Transform2D integrate_twist(Twist2D twist) {
   if (almost_equal(twist.omega, 0)) {
     return Transform2D(Vector2D{twist.x, twist.y});
   }
-
+  // See equation 5 and 6 in kinematics.md
   // {b} is original body frame.
   // {s} is CoR frame
 
@@ -150,11 +150,9 @@ std::istream &operator>>(std::istream &is, Transform2D &tf) {
 }
 
 Transform2D operator*(Transform2D lhs, const Transform2D &rhs) {
-  Point2D p_rhs{rhs.translation().x, rhs.translation().y};
-  auto new_p = lhs(p_rhs);
-
-  double new_ang = lhs.rotation() + rhs.rotation();
-  return {{new_p.x, new_p.y}, new_ang};
+  Transform2D new_t = lhs;
+  new_t *= rhs;
+  return new_t;
 }
 
 } // namespace turtlelib

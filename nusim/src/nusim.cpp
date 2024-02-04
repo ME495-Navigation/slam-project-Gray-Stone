@@ -43,6 +43,8 @@
 #include <visualization_msgs/msg/marker_array.hpp>
 
 #include "nusim/srv/teleport.hpp"
+
+#include <geometry_msgs/msg/pose_with_covariance.hpp>
 // using namespace std::chrono_literals;
 namespace
 {

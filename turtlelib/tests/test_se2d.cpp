@@ -13,7 +13,6 @@
 #include <sstream>
 
 using Catch::Matchers::Equals;
-using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
 
 namespace turtlelib {
