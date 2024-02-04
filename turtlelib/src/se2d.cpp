@@ -102,7 +102,7 @@ Transform2D integrate_twist(Twist2D twist) {
   if (almost_equal(twist.omega, 0)) {
     return Transform2D(Vector2D{twist.x, twist.y});
   }
-  // See equation 5 and 6 in kinematics.md
+  // See equation 6 and 7 in kinematics.md
   // {b} is original body frame.
   // {s} is CoR frame
 

@@ -4,6 +4,7 @@
 #include <catch2/generators/catch_generators_adapters.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include "turtlelib/diff_drive.hpp"
 #include "turtlelib/geometry2d.hpp"
 #include "turtlelib/se2d.hpp"
 #include <catch2/matchers/catch_matchers_templated.hpp>
@@ -39,6 +40,21 @@ public:
 
 private:
   Transform2D tf;
+  double rel;
+};
+
+class WheelConfigWithinRel : public Catch::Matchers::MatcherGenericBase {
+public:
+  WheelConfigWithinRel(WheelConfig const &target_config,
+                       double rel = std::numeric_limits<double>::epsilon() *
+                                    100);
+
+  bool match(WheelConfig const &in) const;
+
+  std::string describe() const;
+
+private:
+  WheelConfig config;
   double rel;
 };
 

@@ -6,7 +6,6 @@
 #include <iosfwd> // contains forward definitions for iostream objects
 
 #include "turtlelib/geometry2d.hpp"
-#include <array>
 
 namespace turtlelib {
 
@@ -105,11 +104,11 @@ private:
   // [ 0      0     1]
 };
 
-
 bool almost_equal(const Transform2D &tf1, const Transform2D &tf2,
-                            double epsilon = 1.0e-12);
+                  double epsilon = 1.0e-12);
 
-//! @brief compute the transformation corresponding a rigid body following a constant twist.
+//! @brief compute the transformation corresponding a rigid body following a
+//! constant twist.
 //! @param  twist the twist to integrate
 //! @return result transform after integrate Tbb'
 Transform2D integrate_twist(Twist2D twist);

@@ -42,4 +42,26 @@ std::string Transform2DWithinRel::describe() const {
   return os.str();
 }
 
+WheelConfigWithinRel::WheelConfigWithinRel(WheelConfig const &target_config,
+                                           double rel)
+    : config{target_config}, rel{rel} {}
+
+bool WheelConfigWithinRel::match(WheelConfig const &in) const {
+
+  if (!WithinRel(config.left, rel).match(in.left)) {
+    return false;
+  }
+  if (!WithinRel(config.right, rel).match(in.right)) {
+    return false;
+  }
+  return true;
+}
+
+std::string WheelConfigWithinRel::describe() const {
+  std::ostringstream os;
+  os << "and WheelConfig " << config << " are within " << rel
+     << " of each other";
+  return os.str();
+}
+
 } // namespace turtlelib
