@@ -27,7 +27,7 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_ros/transform_broadcaster.h>
 
-#include <atomic>
+#include <atomic> // this is single threaded so there is no need for atomics
 #include <chrono>
 #include <functional>
 #include <geometry_msgs/msg/transform_stamped.hpp>
@@ -71,10 +71,12 @@ public:
     // TODO(LEO) I hope to init these param properly, but ros param is only accessible after node is
     // made. x0(x_init), y0(y_init), theta0(theta_init), current_x(x_init), current_y(y_init),
     // current_theta(theta_init)
+    // you can do it in the parameter list, because the Node is already made since this is a subclass of Node.
+    // however you need not do that
   {
     // Parameters
     declare_parameter<int>("rate", 200, GenParamDescriptor("rate", "The rate of main timer"));
-    int rate = get_parameter("rate").as_int();
+    int rate = get_parameter("rate").as_int(); // const auto
 
     declare_parameter<double>("x0", 0.0, GenParamDescriptor("x0", "Initial x position"));
     x0 = get_parameter("x0").as_double();
@@ -108,11 +110,11 @@ public:
     declare_parameter<double>(
       "obstacles/r",
       GenParamDescriptor("obstacles/r", "obstacle radius"));
-    double obstacles_r = get_parameter("obstacles/r").as_double();
+    double obstacles_r = get_parameter("obstacles/r").as_double(); // const auto
 
     if (obstacles_x.size() != obstacles_y.size() ) {
       RCLCPP_ERROR(get_logger(), "Mismatch obstacle x y numbers");
-      exit(1);
+      exit(1); // throw an exception
     }
     PublishObstacles(obstacles_x, obstacles_y, obstacles_r);
 
@@ -310,7 +312,7 @@ private:
 
   // Private Members
   //! atomic prevent timer and service call modify this together
-  std::atomic<uint64_t> time_step_ = 0;
+    std::atomic<uint64_t> time_step_ = 0; // does not need to be atomic, there is no multi-threading here
   double x0 = 0;             // Init x location
   double y0 = 0;             // Init y location
   double theta0 = 0;         // Init theta location

@@ -13,7 +13,7 @@
 
 namespace {
 
-const double kScaleUp = 96;
+    const double kScaleUp = 96; // why not make these constexpr?  // can use auto here
 const unsigned int kPageWidth = 816;
 const unsigned int kPageHeight = 1056;
 
@@ -77,7 +77,7 @@ void Svg::AddObject(Transform2D tf, std::string name, Transform2D base_frame) {
 }
 
 std::ostream &operator<<(std::ostream &os, const Svg &svg) {
-
+    // no commented out code
 //   os << "<svg width=\"" << kPageWidth << "\" height=\"" << kPageHeight
 //      << "\" viewBox=\"0 0 " << kPageWidth << " " << kPageHeight
 //      << "\" "

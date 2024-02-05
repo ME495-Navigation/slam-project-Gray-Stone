@@ -8,7 +8,7 @@ namespace turtlelib
     double normalize_angle(double rad)
     {
         // Citation ---------- [2] ----------
-        return rad - (std::ceil((rad + PI) / (2 * PI)) - 1) * 2 * PI;
+        return rad - (std::ceil((rad + PI) / (2 * PI)) - 1) * 2 * PI; // 2.0, 1.0 pa
     }
     std::ostream &operator<<(std::ostream &os, const Point2D &p)
     {
@@ -28,12 +28,12 @@ namespace turtlelib
         {
             is.get();
         }
-
+        // this has a bug because newlines are left in the stream
         return is;
     }
 
     Vector2D Vector2D::normalize() const{
-       double norm = sqrt(x*x + y*y);
+        double norm = sqrt(x*x + y*y); // const auto
        return {x/norm,y/norm};
     }
 
@@ -66,6 +66,7 @@ namespace turtlelib
             is.get();
         }
 
+        // this has a bug because newlines are left in the stream
         return is;
     }
 

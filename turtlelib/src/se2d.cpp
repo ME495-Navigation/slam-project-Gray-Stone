@@ -19,6 +19,7 @@ std::istream &operator>>(std::istream &is, Twist2D &tw) {
   if (is.peek() == ']') {
     is.get();
   }
+  // bug due to newlines in the stream
   return is;
 }
 
@@ -27,7 +28,7 @@ std::istream &operator>>(std::istream &is, Twist2D &tw) {
 // Transform2D::Transform2D() : row1{1.0, 0.0, 0.0}, row2{0.0, 1.0, 0.0} {}
 Transform2D::Transform2D() : Transform2D({.0, .0}, .0) {}
 
-Transform2D::Transform2D(Vector2D trans) : Transform2D(trans, 0.0) {}
+    Transform2D::Transform2D(Vector2D trans) : Transform2D(trans, 0.0) {} // some newlines between these would be nice from a formatting perspective
 Transform2D::Transform2D(double radians) : Transform2D({0, 0}, radians) {}
 Transform2D::Transform2D(Vector2D trans, double radians)
     : x(trans.x), y(trans.y), cos_t(cos(radians)), sin_t(sin(radians)) {}
@@ -63,7 +64,7 @@ Twist2D Transform2D::operator()(Twist2D v) const {
 }
 
 Transform2D Transform2D::inv() const {
-  return Transform2D{Vector2D{-x * cos_t - y * sin_t, -y * cos_t + x * sin_t},
+    return Transform2D{Vector2D{-x * cos_t - y * sin_t, -y * cos_t + x * sin_t}, // no need to write out Transform2D here (or Vector2D for that matter)
                      -rotation()};
 }
 
@@ -93,7 +94,7 @@ std::ostream &operator<<(std::ostream &os, const Transform2D &tf) {
 }
 
 std::istream &operator>>(std::istream &is, Transform2D &tf) {
-  double deg;
+    double deg; // unitialized variable
   Vector2D vec;
 
   if (is.peek() == 'd') {
@@ -116,7 +117,7 @@ Transform2D operator*(Transform2D lhs, const Transform2D &rhs) {
   Point2D p_rhs{rhs.translation().x, rhs.translation().y};
   auto new_p = lhs(p_rhs);
 
-  double new_ang = lhs.rotation() + rhs.rotation();
+  double new_ang = lhs.rotation() + rhs.rotation(); // const auto
   return {{new_p.x, new_p.y}, new_ang};
 }
 
