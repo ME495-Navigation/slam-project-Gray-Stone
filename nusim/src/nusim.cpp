@@ -76,7 +76,7 @@ public:
   {
     // Parameters
     declare_parameter<int>("rate", 200, GenParamDescriptor("rate", "The rate of main timer"));
-    int rate = get_parameter("rate").as_int();
+    const int rate = get_parameter("rate").as_int();
 
     declare_parameter<double>("x0", 0.0, GenParamDescriptor("x0", "Initial x position"));
     x0 = get_parameter("x0").as_double();
@@ -90,11 +90,11 @@ public:
     declare_parameter<double>(
       "arena_x_length", 5.0,
       GenParamDescriptor("arena_x_length", "x length of arena"));
-    double arena_x_length = get_parameter("arena_x_length").as_double();
+    const double arena_x_length = get_parameter("arena_x_length").as_double();
     declare_parameter<double>(
       "arena_y_length", 3.0,
       GenParamDescriptor("arena_y_length", "x length of arena"));
-    double arena_y_length = get_parameter("arena_y_length").as_double();
+    const double arena_y_length = get_parameter("arena_y_length").as_double();
 
     PublishArenaWalls(arena_x_length, arena_y_length);
 
@@ -102,15 +102,15 @@ public:
     declare_parameter<std::vector<double>>(
       "obstacles/x",
       GenParamDescriptor("obstacles/x", "list of obstacle's x coord"));
-    std::vector<double> obstacles_x = get_parameter("obstacles/x").as_double_array();
+    const std::vector<double> obstacles_x = get_parameter("obstacles/x").as_double_array();
     declare_parameter<std::vector<double>>(
       "obstacles/y",
       GenParamDescriptor("obstacles/y", "list of obstacle's y coord"));
-    std::vector<double> obstacles_y = get_parameter("obstacles/y").as_double_array();
+    const std::vector<double> obstacles_y = get_parameter("obstacles/y").as_double_array();
     declare_parameter<double>(
       "obstacles/r",
       GenParamDescriptor("obstacles/r", "obstacle radius"));
-    double obstacles_r = get_parameter("obstacles/r").as_double();
+    const double obstacles_r = get_parameter("obstacles/r").as_double();
 
     if (obstacles_x.size() != obstacles_y.size() ) {
       RCLCPP_ERROR(get_logger(), "Mismatch obstacle x y numbers");

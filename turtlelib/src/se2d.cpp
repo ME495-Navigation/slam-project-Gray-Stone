@@ -29,7 +29,9 @@ std::istream &operator>>(std::istream &is, Twist2D &tw) {
 Transform2D::Transform2D() : Transform2D({.0, .0}, .0) {}
 
 Transform2D::Transform2D(Vector2D trans) : Transform2D(trans, 0.0) {}
+
 Transform2D::Transform2D(double radians) : Transform2D({0, 0}, radians) {}
+
 Transform2D::Transform2D(Vector2D trans, double radians)
     : x(trans.x), y(trans.y), cos_t(cos(radians)), sin_t(sin(radians)) {}
 
@@ -64,7 +66,7 @@ Twist2D Transform2D::operator()(Twist2D v) const {
 }
 
 Transform2D Transform2D::inv() const {
-  return Transform2D{Vector2D{-x * cos_t - y * sin_t, -y * cos_t + x * sin_t},
+  return {Vector2D{-x * cos_t - y * sin_t, -y * cos_t + x * sin_t},
                      -rotation()};
 }
 
@@ -130,7 +132,7 @@ std::ostream &operator<<(std::ostream &os, const Transform2D &tf) {
 }
 
 std::istream &operator>>(std::istream &is, Transform2D &tf) {
-  double deg;
+  double deg=0;
   Vector2D vec;
 
   if (is.peek() == 'd') {

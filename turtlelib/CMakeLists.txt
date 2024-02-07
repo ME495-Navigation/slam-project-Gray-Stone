@@ -97,6 +97,7 @@ if(BUILD_TESTING)
     add_test(NAME geometry2d_test COMMAND test_geometry2d)
     add_test(NAME se2d_test COMMAND test_se2d)
     add_test(NAME diff_drive_test COMMAND test_diff_drive)
+    add_test(NAME test_svg COMMAND test_svg)
 endif()
 
 

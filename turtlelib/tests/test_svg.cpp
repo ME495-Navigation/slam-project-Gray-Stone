@@ -28,7 +28,7 @@ TEST_CASE("svg test ", "[svg]") {
     oss << svg;
     REQUIRE_THAT(oss.str(),
                  ContainsSubstring(
-                     "<circle cx=\"10\" cy=\"-10\" r=\"3\" stroke=\"blue\" "
+                     "<circle cx=\"960\" cy=\"-960\" r=\"3\" stroke=\"blue\" "
                      "fill=\"blue\" stroke-width=\"1\" />"));
   }
 
@@ -39,7 +39,7 @@ TEST_CASE("svg test ", "[svg]") {
     REQUIRE_THAT(
         oss.str(),
         ContainsSubstring(
-            "<line x1=\"-5\" y1=\"9\" stroke=\"purple\" stroke-width=\"2\" "
+            "<line x1=\"-480\" y1=\"864\" stroke=\"purple\" stroke-width=\"2\" "
             "marker-start=\"url(#Arrow1Sstart)\" />"));
   }
 
@@ -54,13 +54,13 @@ TEST_CASE("svg test ", "[svg]") {
         ContainsSubstring(
             R"xxx(<g transform="translate(0,0) rotate(0)" >)xxx"
             "\n"
-            R"xxx(<g transform="translate(50,50) rotate(22.2)" >)xxx"
+            R"xxx(<g transform="translate(4800,4800) rotate(22.2)" >)xxx"
             "\n"
-            R"xxx(<line x1="20" stroke="red" stroke-width="2" marker-start="url(#Arrow1Sstart)" />)xxx"
+            R"xxx(<line x1="96" stroke="red" stroke-width="2" marker-start="url(#Arrow1Sstart)" />)xxx"
             "\n"
-            R"xxx(<line y1="20" stroke="green" stroke-width="2" marker-start="url(#Arrow1Sstart)" />)xxx"
+            R"xxx(<line y1="96" stroke="green" stroke-width="2" marker-start="url(#Arrow1Sstart)" />)xxx"
             "\n"
-            R"xxx(<text x="5" y="20" font-size="10">{some_name}</text>)xxx"
+            R"xxx(<text x="5" y="-10" font-size="10" transform="scale(1,-1)" >{some_name}</text>)xxx"
             "\n"
             R"xxx(</g>)xxx"
             "\n"

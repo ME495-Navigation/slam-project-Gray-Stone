@@ -5,7 +5,7 @@ namespace turtlelib {
 
 double normalize_angle(double rad) {
   // Citation ---------- [2] ----------
-  return rad - (std::ceil((rad + PI) / (2 * PI)) - 1) * 2 * PI;
+  return rad - (std::ceil((rad + PI) / (2.0 * PI)) - 1.0) * 2.0 * PI;
 }
 std::ostream &operator<<(std::ostream &os, const Point2D &p) {
   os << "[" << p.x << " " << p.y << "]";
@@ -26,7 +26,7 @@ std::istream &operator>>(std::istream &is, Point2D &p) {
 }
 
 Vector2D Vector2D::normalize() const {
-  double norm = magnitude();
+  const double norm = magnitude();
   return {x / norm, y / norm};
 }
 
