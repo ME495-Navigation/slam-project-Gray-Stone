@@ -13,6 +13,7 @@ find_package(ament_cmake REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nuturtlebot_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 find_package(rclcpp REQUIRED)
 
@@ -23,6 +24,8 @@ ament_target_dependencies(
   rclcpp
   std_msgs
   geometry_msgs
+  sensor_msgs
+  nuturtlebot_msgs
   )
 # target_link_libraries(nusim ${cpp_typesupport_target})
 install(TARGETS turtle_control DESTINATION lib/${PROJECT_NAME})

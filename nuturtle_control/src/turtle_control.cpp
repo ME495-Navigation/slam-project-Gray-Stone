@@ -1,12 +1,19 @@
 #include <chrono>
 #include <geometry_msgs/msg/pose_with_covariance.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
+#include <geometry_msgs/msg/twist.hpp>
+#include <nuturtlebot_msgs/msg/detail/sensor_data__struct.hpp>
+#include <nuturtlebot_msgs/msg/sensor_data.hpp>
+#include <nuturtlebot_msgs/msg/wheel_commands.hpp>
+#include <optional>
 #include <rclcpp/exceptions/exceptions.hpp>
 #include <rclcpp/parameter_value.hpp>
-#include <string>
-#include <stdexcept>
-#include <optional>
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp/subscription.hpp>
+#include <sensor_msgs/msg/detail/joint_state__struct.hpp>
+#include <sensor_msgs/msg/joint_state.hpp>
+#include <stdexcept>
+#include <string>
 
 namespace {
 
@@ -47,17 +54,50 @@ public:
             GetParam<double>(*this, "encoder_ticks_per_rad",
                              "encoder ticks of wheel per radius")),
         collision_radius(GetParam<double>(*this, "collision_radius",
-                                          "collision radius of robot")) {}
+                                          "collision radius of robot")) {
+    cmd_vel_listener = create_subscription<geometry_msgs::msg::Twist>(
+        "cmd_vel", 10,
+        std::bind(&TurtleControl::CmdVelCb, this, std::placeholders::_1));
 
+    wheel_cmd_publisher =
+        create_publisher<nuturtlebot_msgs::msg::WheelCommands>("wheel_cmd", 10);
+
+    sensor_data_listener =
+        create_subscription<nuturtlebot_msgs::msg::SensorData>(
+            "sensor_data", 10,
+            std::bind(&TurtleControl::SensorDataCb, this,
+                      std::placeholders::_1));
+
+    joint_state_publisher =
+        create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
+  }
 
 private:
-  // rclcpp::Node::SharedPtr ros_node;
+  // Callbacks
+  void CmdVelCb(const geometry_msgs::msg::Twist &msg) const {
+    // Do something
+  }
+  void SensorDataCb(const nuturtlebot_msgs::msg::SensorData &msg) const {
+    // Do something
+  }
+
+  // parameters
   double wheel_radius;
   double track_width;
   double motor_cmd_max;
   double motor_cmd_per_rad_sec;
   int encoder_ticks_per_rad;
   double collision_radius;
+
+  // Ros comm components
+  rclcpp::Publisher<nuturtlebot_msgs::msg::WheelCommands>::SharedPtr
+      wheel_cmd_publisher;
+  rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr
+      joint_state_publisher;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_listener;
+  rclcpp::Subscription<nuturtlebot_msgs::msg::SensorData>::SharedPtr
+      sensor_data_listener;
+  
 };
 
 int main(int argc, char *argv[]) {
