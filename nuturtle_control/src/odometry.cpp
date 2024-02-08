@@ -15,6 +15,7 @@
 #include <nuturtlebot_msgs/msg/wheel_commands.hpp>
 #include <optional>
 #include <rclcpp/exceptions/exceptions.hpp>
+#include <rclcpp/logger.hpp>
 #include <rclcpp/logging.hpp>
 #include <rclcpp/parameter_value.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -49,7 +50,7 @@ public:
         diff_bot(track_width, wheel_radius), tf_broadcaster(*this) {
 
     js_linstener = create_subscription<sensor_msgs::msg::JointState>(
-        "sensor_data", 10,
+        "joint_states", 10,
         std::bind(&Odometry::JointStateCb, this, std::placeholders::_1));
 
     odom_publisher = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
@@ -95,13 +96,11 @@ public:
     odom_publisher->publish(odom_msg);
 
     geometry_msgs::msg::TransformStamped tf_stamped;
-    tf_stamped.header.frame_id = body_id;
-    tf_stamped.child_frame_id = odom_id;
+    tf_stamped.header.frame_id = odom_id;
+    tf_stamped.child_frame_id = body_id;
     tf_stamped.header.stamp = msg.header.stamp;
     tf_stamped.transform = leo_ros_helper::Convert(odom_msg.pose.pose);
-    RCLCPP_ERROR(get_logger() , "TF sending");
 
-    
     tf_broadcaster.sendTransform(tf_stamped);
     last_stamped_tf2d = std::pair{current_time, bot_tf};
   }

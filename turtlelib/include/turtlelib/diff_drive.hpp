@@ -23,6 +23,16 @@ struct WheelConfig {
 //! @return Sum of two wheen config
 WheelConfig operator+(WheelConfig lhs, WheelConfig rhs);
 
+//! @brief Scale wheel config by a floating point scaler. Will scale each wheel
+//! value independently (more commonly used by WheelVelocity)
+//! @param lhs Wheel config value to scale
+//! @param rhs scaling scaler
+//! @return scaled wheel config 
+WheelConfig operator*(WheelConfig lhs, double rhs);
+
+//! @brief See the other operator*.
+WheelConfig operator*(double lhs, WheelConfig  rhs);
+
 /// \brief print the WheelConfig in the format [L:left R:right]
 /// \param os out the ostream to write to
 /// \param config the wheel config to output
@@ -90,8 +100,13 @@ public:
   //! @return Transform2D of curent body config
   Transform2D GetBodyConfig();
 
-  
+  //! @brief Set the body configuration (teleport)
+  //! @param new_tf - New transformation robot should teleport to
   void SetBodyConfig(const Transform2D& new_tf);
+
+  //! @brief Get the current wheel config
+  //! @return Current wheel config
+  WheelConfig GetWheelConfig();
 
 private:
   // These parameters are required in constructor

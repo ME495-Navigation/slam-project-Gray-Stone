@@ -16,6 +16,12 @@ WheelConfig operator+(WheelConfig lhs, WheelConfig rhs) {
   return WheelConfig{lhs.left += rhs.left, lhs.right += rhs.right};
 }
 
+WheelConfig operator*(WheelConfig lhs, double rhs) {
+  return {lhs.left * rhs, lhs.right * rhs};
+}
+
+WheelConfig operator*(double lhs, WheelConfig rhs) { return rhs * lhs; }
+
 std::ostream &operator<<(std::ostream &os, const WheelConfig &config) {
   os << "[L:" << config.left << " R:" << config.right << "]";
   return os;
@@ -79,7 +85,7 @@ Twist2D DiffDrive::TwistFromWheelDelta(WheelConfig wheel_delta,
   return Twist2D{delta_omega, delta_x, delta_y};
 }
 
-WheelVelocity DiffDrive::CommandFromTwist(Twist2D cmd) const{
+WheelVelocity DiffDrive::CommandFromTwist(Twist2D cmd) const {
   // See equation 8 and 9 in kinematics.md
 
   if (!almost_equal(cmd.y, 0)) {
@@ -92,8 +98,10 @@ WheelVelocity DiffDrive::CommandFromTwist(Twist2D cmd) const{
 
 Transform2D DiffDrive::GetBodyConfig() { return current_state_; }
 
-void DiffDrive::SetBodyConfig(const Transform2D &new_tf){
+void DiffDrive::SetBodyConfig(const Transform2D &new_tf) {
   current_state_ = new_tf;
 }
+
+WheelConfig DiffDrive::GetWheelConfig() { return current_wheel_config_; }
 
 } // namespace turtlelib

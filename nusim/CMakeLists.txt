@@ -12,6 +12,9 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(nuturtlebot_msgs REQUIRED)
+find_package(turtlelib REQUIRED)
+
 find_package(visualization_msgs REQUIRED)
 
 find_package(rosidl_default_generators REQUIRED)
@@ -57,8 +60,10 @@ ament_target_dependencies(
   std_srvs
   tf2
   tf2_ros
-  visualization_msgs)
-target_link_libraries(nusim ${cpp_typesupport_target})
+  visualization_msgs
+  nuturtlebot_msgs
+  turtlelib)
+target_link_libraries(nusim ${cpp_typesupport_target} turtlelib::turtlelib)
 install(TARGETS nusim DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY

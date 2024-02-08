@@ -1,8 +1,8 @@
+#include <algorithm>
 #include <cstdint>
 #include <geometry_msgs/msg/pose_with_covariance.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/twist.hpp>
-#include <nuturtlebot_msgs/msg/detail/sensor_data__struct.hpp>
 #include <nuturtlebot_msgs/msg/sensor_data.hpp>
 #include <nuturtlebot_msgs/msg/wheel_commands.hpp>
 #include <optional>
@@ -11,9 +11,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/subscription.hpp>
 #include <rclcpp/time.hpp>
-#include <sensor_msgs/msg/detail/joint_state__struct.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
-#include <std_msgs/msg/detail/header__struct.hpp>
 #include <stdexcept>
 #include <string>
 #include <turtlelib/diff_drive.hpp>
@@ -57,6 +55,14 @@ public:
 
     joint_state_publisher =
         create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
+
+    last_js.header.stamp = get_clock()->now();
+
+    // Stuff the last_js up so on first cycle, it will survive
+    last_js.name.push_back("wheel_left_joint");
+    last_js.name.push_back("wheel_right_joint");
+    last_js.position.push_back(0);
+    last_js.position.push_back(0);
   }
 
 private:
@@ -70,8 +76,24 @@ private:
     // Publish wheel_cmd to make turtlebot 3 walk
 
     auto wheel_cmd = nuturtlebot_msgs::msg::WheelCommands();
-    wheel_cmd.left_velocity = wheel_calc.left;
-    wheel_cmd.right_velocity = wheel_calc.right;
+
+
+    // Need to the speed clipping in double.
+     double motor_cmd_left=  wheel_calc.left/ motor_cmd_per_rad_sec;
+     double motor_cmd_right= wheel_calc.right/ motor_cmd_per_rad_sec;
+    int32_t higher_velocity = std::max(motor_cmd_left,motor_cmd_right);
+    double scale_factor = 1;
+    if (higher_velocity > motor_cmd_max) {
+      scale_factor = motor_cmd_max / higher_velocity;
+      RCLCPP_WARN_STREAM(
+        get_logger(),
+        "Motor command velocity is maxing out. Clipping back down. "
+          << scale_factor << " times over");
+    }
+
+    // Now finally put it back into integer.
+    wheel_cmd.left_velocity  = static_cast<int32_t>(motor_cmd_left * scale_factor);
+    wheel_cmd.right_velocity = static_cast<int32_t>(motor_cmd_right * scale_factor);
 
     wheel_cmd_publisher->publish(wheel_cmd);
   }
@@ -84,6 +106,7 @@ private:
         rclcpp::Time{msg.stamp.sec, msg.stamp.nanosec}.seconds() -
         rclcpp::Time{last_js.header.stamp.sec, msg.stamp.nanosec}.seconds();
 
+    // TODO check the time_diff. it might not be doing velocity right.
     sensor_msgs::msg::JointState js;
     js.header.stamp.sec = msg.stamp.sec;
     js.header.stamp.nanosec = msg.stamp.nanosec;
