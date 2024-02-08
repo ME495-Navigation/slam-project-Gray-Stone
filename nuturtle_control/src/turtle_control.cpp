@@ -1,4 +1,3 @@
-#include <chrono>
 #include <cstdint>
 #include <geometry_msgs/msg/pose_with_covariance.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
@@ -19,29 +18,10 @@
 #include <string>
 #include <turtlelib/diff_drive.hpp>
 #include <turtlelib/se2d.hpp>
-#include <chrono>
-namespace {
 
-template <typename T>
-T GetParam(rclcpp::Node &ros_node, std::string name, std::string description,
-           std::optional<T> default_value = std::nullopt) {
-  auto desc = rcl_interfaces::msg::ParameterDescriptor();
-  desc.name = name;
-  desc.description = description;
-  if (default_value.has_value()) {
-    ros_node.declare_parameter<T>(name, default_value.value(), desc);
-    return ros_node.get_parameter(name).get_value<T>();
-  } else {
-    ros_node.declare_parameter<T>(name, rclcpp::PARAMETER_NOT_SET, desc);
-    T val = ros_node.get_parameter(name).get_value<T>();
-    if (val == rclcpp::PARAMETER_NOT_SET) {
-      RCLCPP_ERROR_STREAM(ros_node.get_logger(), "Missing parameter " << name);
-      throw std::invalid_argument("Bad parameters");
-    }
-    return val;
-  }
-}
-} // namespace
+#include "nuturtle_control/ros_param_helper.hpp"
+
+using leo_ros_helper::GetParam ;
 
 class TurtleControl : public rclcpp::Node {
 

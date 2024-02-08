@@ -136,7 +136,6 @@ public:
       "~/teleport",
       std::bind(&NuSim::teleport_callback, this, std::placeholders::_1, std::placeholders::_2));
 
-
     // Setup timer and set things in motion.
     main_timer_ = this->create_wall_timer(
       std::chrono::milliseconds(1000 / rate),

@@ -90,6 +90,9 @@ public:
   //! @return Transform2D of curent body config
   Transform2D GetBodyConfig();
 
+  
+  void SetBodyConfig(const Transform2D& new_tf);
+
 private:
   // These parameters are required in constructor
   double wheel_body_track_; // half distance between two wheels

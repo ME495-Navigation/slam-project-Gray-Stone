@@ -92,4 +92,8 @@ WheelVelocity DiffDrive::CommandFromTwist(Twist2D cmd) const{
 
 Transform2D DiffDrive::GetBodyConfig() { return current_state_; }
 
+void DiffDrive::SetBodyConfig(const Transform2D &new_tf){
+  current_state_ = new_tf;
+}
+
 } // namespace turtlelib
