@@ -71,7 +71,6 @@ public:
       }
     }
 
-      RCLCPP_ERROR_STREAM(get_logger() , "ODOM received wheel "<<new_config);
     diff_bot.UpdateRobotConfig(new_config);
 
     turtlelib::Transform2D bot_tf = diff_bot.GetBodyConfig();

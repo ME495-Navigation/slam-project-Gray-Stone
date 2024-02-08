@@ -13,7 +13,11 @@ WheelConfig &WheelConfig::operator+=(const WheelConfig &rhs) {
 }
 
 WheelConfig operator+(WheelConfig lhs, WheelConfig rhs) {
-  return WheelConfig{lhs.left += rhs.left, lhs.right += rhs.right};
+  return WheelConfig{lhs.left + rhs.left, lhs.right + rhs.right};
+}
+
+WheelConfig operator-(WheelConfig lhs, WheelConfig rhs) {
+  return WheelConfig{lhs.left - rhs.left, lhs.right - rhs.right};
 }
 
 WheelConfig operator*(WheelConfig lhs, double rhs) {

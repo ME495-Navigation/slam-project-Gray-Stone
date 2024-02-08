@@ -23,6 +23,14 @@ struct WheelConfig {
 //! @return Sum of two wheen config
 WheelConfig operator+(WheelConfig lhs, WheelConfig rhs);
 
+//! @brief Subtraction operator for two wheelconfig. simply subtract left to left, right
+//! to right
+//! @param lhs Wheel config 1
+//! @param rhs Wheel config 2
+//! @return DIff of two wheen config
+WheelConfig operator-(WheelConfig lhs, WheelConfig rhs) ;
+
+
 //! @brief Scale wheel config by a floating point scaler. Will scale each wheel
 //! value independently (more commonly used by WheelVelocity)
 //! @param lhs Wheel config value to scale

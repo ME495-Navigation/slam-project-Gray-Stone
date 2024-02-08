@@ -24,9 +24,8 @@
     <!-- The NuSim special. so special remap for them -->
     <group if="$(eval ' \'$(var robot)\' == \'nusim\' ')">
 
-        <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share nuturtle_control)/config/blue_red.rviz"
-        if="$(eval '\'$(var use_rviz)\' ')" />
-    
+        <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share nuturtle_control)/config/blue_red.rviz" if="$(eval '\'$(var use_rviz)\' ')" />
+
         <node pkg="nuturtle_control" exec="odometry" output="screen">
             <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
             <param name="body_id" value="/blue/base_footprint"/>
@@ -53,10 +52,10 @@
     </group>
 
     <group if="$(eval ' \'$(var robot)\' == \'localhost\' ')">
-
         <node pkg="nuturtle_control" exec="odometry" output="screen">
             <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
             <param name="body_id" value="/blue/base_footprint"/>
+            <!-- <remap from="joint_states" to="blue/joint_states"/> -->
         </node>
 
         <node pkg="nuturtle_control" exec="turtle_control" output="screen">
@@ -64,14 +63,27 @@
             <!-- <remap from="joint_states" to="blue/joint_states"/> -->
         </node>
 
-        
+        <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share nuturtle_control)/config/blue.rviz" if="$(eval '\'$(var use_rviz)\' ')">
+        </node>
+
+        <include file="$(find-pkg-share nuturtle_description)/launch/load_one.launch.py">
+            <arg name="use_rviz" value="False" />
+            <arg name="color" value="blue"/>
+            <arg name="use_jsp" value="true"/>
+        </include>
+
+
+
     </group>
 
     <group if="$(eval ' \'$(var robot)\' == \'none\' ')">
 
-        <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share nuturtle_control)/config/blue.rviz"
-        if="$(eval '\'$(var use_rviz)\' ')" />
-    
+        <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share nuturtle_control)/config/blue.rviz" if="$(eval '\'$(var use_rviz)\' ')" />
+
+        <include file="$(find-pkg-share nuturtle_description)/launch/load_one.launch.py">
+            <arg name="use_rviz" value="False" />
+            <arg name="color" value="blue"/>
+        </include>
     </group>
 
 
@@ -81,9 +93,5 @@
     <node pkg="tf2_ros" exec="static_transform_publisher" name="world_odom_static_pub" args=" --frame-id nusim/world --child-frame-id odom"/>
 
 
-    <include file="$(find-pkg-share nuturtle_description)/launch/load_one.launch.py">
-        <arg name="use_rviz" value="False" />
-        <arg name="color" value="blue"/>
-    </include>
 
 </launch>

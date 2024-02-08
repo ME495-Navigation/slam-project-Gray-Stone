@@ -42,6 +42,7 @@
 #include <std_msgs/msg/u_int64.hpp>
 #include <std_srvs/srv/empty.hpp>
 #include <string>
+#include <turtlelib/geometry2d.hpp>
 #include <turtlelib/se2d.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
@@ -230,9 +231,18 @@ private:
     double period_sec = std::chrono::duration<double>(update_period).count();
     red_bot->UpdateBodyConfigWithVel(vel * motor_cmd_per_rad_sec * period_sec);
 
-    
-    auto new_wheel_config =  red_bot->GetWheelConfig();
-    RCLCPP_WARN_STREAM(get_logger(),"Nusim sent  wheel "<<new_wheel_config);
+    auto new_wheel_config = red_bot->GetWheelConfig();
+    if (std::abs(new_wheel_config.left - old_wheel_config.left) >
+            turtlelib::PI ||
+        std::abs(new_wheel_config.right - old_wheel_config.right) >
+            turtlelib::PI) {
+      turtlelib::WheelConfig bad_delta{
+          new_wheel_config.left - old_wheel_config.left,
+          new_wheel_config.right - old_wheel_config.right};
+      RCLCPP_WARN_STREAM(get_logger(),
+                         "This steps's wheel increment is more then PI! "
+                             << bad_delta);
+    }
 
     nuturtlebot_msgs::msg::SensorData red_sensor_msg;
     red_sensor_msg.left_encoder = encoder_ticks_per_rad * new_wheel_config.left;
@@ -240,6 +250,7 @@ private:
     red_sensor_msg.stamp = get_clock()->now();
     red_sensor_publisher_->publish(red_sensor_msg);
 
+    old_wheel_config = new_wheel_config;
     time_step_publisher_->publish(msg);
 
     // Publish TF for red robot
@@ -415,7 +426,7 @@ private:
   std::unique_ptr<turtlelib::DiffDrive> red_bot;
   double motor_cmd_per_rad_sec;
   double encoder_ticks_per_rad;
-  
+  turtlelib::WheelConfig old_wheel_config;
   // Private ros members
   rclcpp::TimerBase::SharedPtr main_timer_;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr reset_service_;
