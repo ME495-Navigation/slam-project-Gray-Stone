@@ -17,6 +17,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(turtlelib REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
@@ -35,6 +36,7 @@ target_link_libraries(nuturtle_control turtlelib::turtlelib)
 rosidl_generate_interfaces(
   ${PROJECT_NAME}_IDL
   "srv/InitPose.srv"
+  "srv/Control.srv"
   LIBRARY_NAME
   ${PROJECT_NAME} # This is a necessary line. And it MUST be PROJECT_NAME !!
   # DEPENDENCIES geometry_msgs # Add packages that above messages depend on, in
@@ -71,6 +73,23 @@ ament_target_dependencies(
 target_link_libraries(odometry turtlelib::turtlelib nuturtle_control
                       ${cpp_typesupport_target})
 install(TARGETS turtle_control odometry DESTINATION lib/${PROJECT_NAME})
+
+add_executable(circle src/circle.cpp)
+ament_target_dependencies(
+  circle
+  rclcpp
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+  nuturtlebot_msgs
+  turtlelib
+  nav_msgs
+  tf2
+  tf2_ros
+  std_srvs)
+target_link_libraries(circle turtlelib::turtlelib nuturtle_control
+                      ${cpp_typesupport_target})
+install(TARGETS turtle_control odometry circle DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 
