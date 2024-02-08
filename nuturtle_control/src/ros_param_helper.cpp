@@ -1,4 +1,5 @@
 #include "nuturtle_control/ros_param_helper.hpp"
+#include <rclcpp/parameter_value.hpp>
 
 namespace leo_ros_helper {
 
@@ -12,7 +13,10 @@ GetParamStr(rclcpp::Node &ros_node, std::string name, std::string description,
     ros_node.declare_parameter<std::string>(name, default_value.value(), desc);
     return ros_node.get_parameter(name).get_value<std::string>();
   } else {
-    ros_node.declare_parameter(name, rclcpp::PARAMETER_NOT_SET, desc);
+    // Note: Because we are using non templated one, It's now all live dynamic
+    // casting inside this. So have to use PARAMETER_STRING. Or the next line
+    // will throw.
+    ros_node.declare_parameter(name, rclcpp::PARAMETER_STRING, desc);
     try {
 
       std::string val = ros_node.get_parameter(name).get_value<std::string>();

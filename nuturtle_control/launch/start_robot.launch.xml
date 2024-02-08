@@ -1,10 +1,63 @@
 <launch>
 
-    <arg name="config_file" default="$(find-pkg-share nusim)/config/basic_world.yaml"
-    description="Parameter Config file for nusim, default at $(find-pkg-share nusim)/config/basic_world.yaml" />
+    <arg name="cmd_src" default="circle"
+    description="The source of the cmd. 
+        circle - circle node. 
+        teleop - teleop_keyboard. 
+        none - start nothing for cmd" />
+    
+    <arg name="robot" default="nusim"
+    description="mode of running robot: 
+        nusim - run simulator, odometry, and turtle_control. 
+        localhost - run nodes directly from turtlebot3 
+        none - Not launching any additional nodes" />
 
-    <node pkg="nuturtle_control" exec="turtle_control" output="screen">
+    <arg name="use_rviz" default="true"
+    description="Enable using rviz" />
+
+    <!-- Rviz -->
+    <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share nuturtle_control)/config/blue_red.rviz"
+    if="$(eval '\'$(var use_rviz)\' and ( \'$(var robot)\'!=\'localhost\' )')"
+    />
+
+    <!-- CMD input sutff -->
+    <node pkg="nuturtle_control" exec="circle" output="screen" 
+    if="$(eval ' \'$(var cmd_src)\' == \'circle\' ')" />
+    
+    <node pkg="turtlebot3_teleop" exec="teleop_keyboard" output="screen" 
+    if="$(eval ' \'$(var cmd_src)\' == \'teleop\' ')" />
+    
+    
+    <!-- Robot stuff -->
+    <node pkg="nuturtle_control" exec="odometry" output="screen" 
+        if="$(eval ' \'$(var robot)\' == \'nusim\' ')" >
+        <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
+        <param name="body_id" value="/blue/base_footprint"/>
+    </node>  
+    
+    <node pkg="nuturtle_control" exec="turtle_control" output="screen" 
+        if="$(eval ' \'$(var robot)\' == \'nusim\' ')">
         <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
     </node>
+
+    <include file="$(find-pkg-share nusim)/launch/nusim.launch.xml">
+        <arg name="use_rviz" value="false" />
+    </include>
+
+
+
+
+
+    <!-- $(eval '<python_expr>') -->
+
+
+    <node pkg="tf2_ros" exec="static_transform_publisher" 
+        name="world_odom_static_pub" args="0 0 0 0 0 0 nusim/world odom"/>
+
+
+    <include file="$(find-pkg-share nuturtle_description)/launch/load_one.launch.py">
+        <arg name="use_rviz" value="False" />
+        <arg name="color" value="blue" />
+    </include>
 
 </launch>

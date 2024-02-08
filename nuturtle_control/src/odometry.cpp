@@ -15,6 +15,7 @@
 #include <nuturtlebot_msgs/msg/wheel_commands.hpp>
 #include <optional>
 #include <rclcpp/exceptions/exceptions.hpp>
+#include <rclcpp/logging.hpp>
 #include <rclcpp/parameter_value.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/service.hpp>
@@ -62,9 +63,9 @@ public:
 
     turtlelib::WheelConfig new_config;
     for (size_t i = 0; i < msg.name.size(); ++i) {
-      if (msg.name.at(i) == "wheel_left_joint") {
+      if (msg.name.at(i) == wheel_left) {
         new_config.left = msg.position.at(i);
-      } else if (msg.name.at(i) == "wheel_right_joint") {
+      } else if (msg.name.at(i) == wheel_right) {
         new_config.right = msg.position.at(i);
       }
     }
@@ -94,12 +95,13 @@ public:
     odom_publisher->publish(odom_msg);
 
     geometry_msgs::msg::TransformStamped tf_stamped;
-
     tf_stamped.header.frame_id = body_id;
     tf_stamped.child_frame_id = odom_id;
     tf_stamped.header.stamp = msg.header.stamp;
     tf_stamped.transform = leo_ros_helper::Convert(odom_msg.pose.pose);
+    RCLCPP_ERROR(get_logger() , "TF sending");
 
+    
     tf_broadcaster.sendTransform(tf_stamped);
     last_stamped_tf2d = std::pair{current_time, bot_tf};
   }

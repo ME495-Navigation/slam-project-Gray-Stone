@@ -16,6 +16,8 @@ With modification of
   <xacro:property name="wheel_radius" value="${ddrive_prop['wheel_radius']}" />
   <xacro:property name="track_width" value="${ddrive_prop['track_width']}" />
   <xacro:property name="collision_radius" value="${ddrive_prop['collision_radius']}" />
+  <xacro:property name="wheel_left_name" value="${ddrive_prop['wheel_left']}" />
+  <xacro:property name="wheel_right_name" value="${ddrive_prop['wheel_right']}" />
   
   <!-- Possible value red green blue purple -->
   <xacro:property name="color" value="$(arg color)" />
@@ -60,7 +62,7 @@ With modification of
     </inertial>
   </link>
 
-  <joint name="wheel_left_joint" type="continuous">
+  <joint name="${wheel_left_name}" type="continuous">
     <parent link="base_link"/>
     <child link="wheel_left_link"/>
     <origin xyz="0.0 ${track_width/2} 0.023" rpy="-1.57 0 0"/>
@@ -90,7 +92,7 @@ With modification of
     </inertial>
   </link>
 
-  <joint name="wheel_right_joint" type="continuous">
+  <joint name="${wheel_right_name}" type="continuous">
     <parent link="base_link"/>
     <child link="wheel_right_link"/>
     <origin xyz="0.0 -${track_width/2} 0.023" rpy="-1.57 0 0"/>
