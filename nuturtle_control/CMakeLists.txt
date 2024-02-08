@@ -16,6 +16,7 @@ find_package(nuturtlebot_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 
 find_package(rclcpp REQUIRED)
+find_package(turtlelib REQUIRED)
 
 
 add_executable(turtle_control src/turtle_control.cpp)
@@ -26,8 +27,9 @@ ament_target_dependencies(
   geometry_msgs
   sensor_msgs
   nuturtlebot_msgs
+  turtlelib
   )
-# target_link_libraries(nusim ${cpp_typesupport_target})
+target_link_libraries(turtle_control turtlelib::turtlelib)
 install(TARGETS turtle_control DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch

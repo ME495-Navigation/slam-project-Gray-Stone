@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cstdint>
 #include <geometry_msgs/msg/pose_with_covariance.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/twist.hpp>
@@ -10,11 +11,15 @@
 #include <rclcpp/parameter_value.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/subscription.hpp>
+#include <rclcpp/time.hpp>
 #include <sensor_msgs/msg/detail/joint_state__struct.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <std_msgs/msg/detail/header__struct.hpp>
 #include <stdexcept>
 #include <string>
-
+#include <turtlelib/diff_drive.hpp>
+#include <turtlelib/se2d.hpp>
+#include <chrono>
 namespace {
 
 template <typename T>
@@ -54,7 +59,9 @@ public:
             GetParam<double>(*this, "encoder_ticks_per_rad",
                              "encoder ticks of wheel per radius")),
         collision_radius(GetParam<double>(*this, "collision_radius",
-                                          "collision radius of robot")) {
+                                          "collision radius of robot")),
+        diff_bot(track_width, wheel_radius)
+  {
     cmd_vel_listener = create_subscription<geometry_msgs::msg::Twist>(
         "cmd_vel", 10,
         std::bind(&TurtleControl::CmdVelCb, this, std::placeholders::_1));
@@ -75,10 +82,61 @@ public:
 private:
   // Callbacks
   void CmdVelCb(const geometry_msgs::msg::Twist &msg) const {
-    // Do something
+    // map the twist msg into Twist2D
+    auto wheel_calc = diff_bot.CommandFromTwist(turtlelib::Twist2D{msg.angular.z , msg.linear.x,msg.linear.y});
+    // wheel_cmd.left
+    // msg.angular.z
+    
+    // Publish wheel_cmd to make turtlebot 3 walk
+
+    auto wheel_cmd = nuturtlebot_msgs::msg::WheelCommands();
+    wheel_cmd.left_velocity = wheel_calc.left;
+    wheel_cmd.right_velocity = wheel_calc.right;
+
+    wheel_cmd_publisher->publish(wheel_cmd);
   }
-  void SensorDataCb(const nuturtlebot_msgs::msg::SensorData &msg) const {
-    // Do something
+  void SensorDataCb(const nuturtlebot_msgs::msg::SensorData &msg) {
+
+    auto left_p = EncoderToRad(msg.left_encoder);
+    auto right_p = EncoderToRad(msg.right_encoder);
+
+    double time_diff =
+        rclcpp::Time{msg.stamp.sec, msg.stamp.nanosec}.seconds() -
+        rclcpp::Time{last_js.header.stamp.sec, msg.stamp.nanosec}.seconds();
+
+    sensor_msgs::msg::JointState js;
+    js.header.stamp.sec = msg.stamp.sec;
+    js.header.stamp.nanosec = msg.stamp.nanosec;
+
+    js.name.push_back("wheel_left_joint");
+    js.position.push_back(left_p);
+    js.velocity.push_back((left_p - last_js.position.at(0)) / time_diff);
+
+    js.name.push_back("wheel_right_joint");
+    js.position.push_back(right_p);
+    js.velocity.push_back((right_p - last_js.position.at(1)) / time_diff);
+
+    // Publish to joint_states
+    joint_state_publisher->publish(js);
+    last_js = js;
+  }
+
+  double EncoderToRad(int32_t tick){
+    return static_cast<double>(tick) /
+                     static_cast<double>(encoder_ticks_per_rad);
+  }
+
+  std::pair<double,double> CalcOneEncoder(int32_t new_tick , int32_t old_tick){
+    double new_rad = static_cast<double>(new_tick) /
+                     static_cast<double>(encoder_ticks_per_rad);
+
+    double old_rad = static_cast<double>(old_tick) /
+                     static_cast<double>(encoder_ticks_per_rad);
+
+    double rad_diff = new_rad - old_rad ;
+
+    // If the encoder never wrap around, we don't need to normalize
+    return {new_rad, turtlelib::normalize_angle(rad_diff)};
   }
 
   // parameters
@@ -88,6 +146,11 @@ private:
   double motor_cmd_per_rad_sec;
   int encoder_ticks_per_rad;
   double collision_radius;
+
+
+  turtlelib::DiffDrive diff_bot;
+
+  sensor_msgs::msg::JointState last_js;
 
   // Ros comm components
   rclcpp::Publisher<nuturtlebot_msgs::msg::WheelCommands>::SharedPtr

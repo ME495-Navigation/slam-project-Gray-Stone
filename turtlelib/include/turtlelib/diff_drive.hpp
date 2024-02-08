@@ -84,7 +84,7 @@ public:
   //! @brief Generate wheel velocity cmd from given body twist command.
   //! @param cmd Desire commanded twist
   //! @return The wheel velocity (rad) that matches this twist command.
-  WheelVelocity CommandFromTwist(Twist2D cmd);
+  WheelVelocity CommandFromTwist(Twist2D cmd) const;
 
   //! @brief Get the current body configuration (in world frame)
   //! @return Transform2D of curent body config

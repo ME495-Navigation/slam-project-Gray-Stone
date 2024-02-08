@@ -79,7 +79,7 @@ Twist2D DiffDrive::TwistFromWheelDelta(WheelConfig wheel_delta,
   return Twist2D{delta_omega, delta_x, delta_y};
 }
 
-WheelVelocity DiffDrive::CommandFromTwist(Twist2D cmd) {
+WheelVelocity DiffDrive::CommandFromTwist(Twist2D cmd) const{
   // See equation 8 and 9 in kinematics.md
 
   if (!almost_equal(cmd.y, 0)) {
