@@ -232,10 +232,12 @@ private:
 
     
     auto new_wheel_config =  red_bot->GetWheelConfig();
+    RCLCPP_WARN_STREAM(get_logger(),"Nusim sent  wheel "<<new_wheel_config);
 
     nuturtlebot_msgs::msg::SensorData red_sensor_msg;
     red_sensor_msg.left_encoder = encoder_ticks_per_rad * new_wheel_config.left;
     red_sensor_msg.right_encoder = encoder_ticks_per_rad * new_wheel_config.right;
+    red_sensor_msg.stamp = get_clock()->now();
     red_sensor_publisher_->publish(red_sensor_msg);
 
     time_step_publisher_->publish(msg);

@@ -23,19 +23,18 @@
 
     <!-- The NuSim special. so special remap for them -->
     <group if="$(eval ' \'$(var robot)\' == \'nusim\' ')">
+        <!-- NuSim, display the red -->
+        <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share nuturtle_control)/config/blue_red.rviz" if="$(eval '\'$(var use_rviz)\'" />
 
-        <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share nuturtle_control)/config/blue_red.rviz"
-        if="$(eval '\'$(var use_rviz)\' ')" />
-    
         <node pkg="nuturtle_control" exec="odometry" output="screen">
             <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
             <param name="body_id" value="/blue/base_footprint"/>
-            <remap from="joint_states" to="red/joint_states"/>
+            <remap from="joint_state" to="red/joint_state"/>
         </node>
 
         <node pkg="nuturtle_control" exec="turtle_control" output="screen">
             <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
-            <remap from="joint_states" to="red/joint_states"/>
+            <remap from="joint_state" to="red/joint_state"/>
         </node>
 
         <node pkg="nusim" exec="nusim" output="screen">
@@ -45,14 +44,18 @@
             <remap from="red/wheel_cmd" to="wheel_cmd"/>
         </node>
 
-        <!-- To show red turtle bot -->
         <include file="$(find-pkg-share nuturtle_description)/launch/load_one.launch.py">
             <arg name="use_rviz" value="False" />
             <arg name="color" value="red" />
+            <arg name="use_jsp" value="false"/>
         </include>
-    </group>
 
+    </group> 
+    
     <group if="$(eval ' \'$(var robot)\' == \'localhost\' ')">
+        <!-- display only blue. none mode -->
+        <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share nuturtle_control)/config/blue.rviz" 
+            if="$(eval '\'$(var use_rviz)\'" />
 
         <node pkg="nuturtle_control" exec="odometry" output="screen">
             <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
@@ -64,21 +67,18 @@
             <!-- <remap from="joint_states" to="blue/joint_states"/> -->
         </node>
 
-        
+        <node pkg="numsr_turtlebot" exec="numsr_turtlebot" output="screen"/>
+
     </group>
 
+    <!-- included for completeness -->
     <group if="$(eval ' \'$(var robot)\' == \'none\' ')">
-
-        <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share nuturtle_control)/config/blue.rviz"
-        if="$(eval '\'$(var use_rviz)\' ')" />
-    
     </group>
-
 
     <!-- $(eval '<python_expr>') -->
 
-
-    <node pkg="tf2_ros" exec="static_transform_publisher" name="world_odom_static_pub" args=" --frame-id nusim/world --child-frame-id odom"/>
+    <node pkg="tf2_ros" exec="static_transform_publisher" name="world_odom_static_pub" 
+        args=" --frame-id nusim/world --child-frame-id odom"/>
 
 
     <include file="$(find-pkg-share nuturtle_description)/launch/load_one.launch.py">

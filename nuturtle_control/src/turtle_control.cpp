@@ -129,18 +129,6 @@ private:
                      static_cast<double>(encoder_ticks_per_rad);
   }
 
-  std::pair<double,double> CalcOneEncoder(int32_t new_tick , int32_t old_tick){
-    double new_rad = static_cast<double>(new_tick) /
-                     static_cast<double>(encoder_ticks_per_rad);
-
-    double old_rad = static_cast<double>(old_tick) /
-                     static_cast<double>(encoder_ticks_per_rad);
-
-    double rad_diff = new_rad - old_rad ;
-
-    // If the encoder never wrap around, we don't need to normalize
-    return {new_rad, turtlelib::normalize_angle(rad_diff)};
-  }
 
   // parameters
   double wheel_radius;
