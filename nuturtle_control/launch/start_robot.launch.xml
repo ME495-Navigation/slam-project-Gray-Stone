@@ -1,0 +1,10 @@
+<launch>
+
+    <arg name="config_file" default="$(find-pkg-share nusim)/config/basic_world.yaml"
+    description="Parameter Config file for nusim, default at $(find-pkg-share nusim)/config/basic_world.yaml" />
+
+    <node pkg="nuturtle_control" exec="turtle_control" output="screen">
+        <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
+    </node>
+
+</launch>
