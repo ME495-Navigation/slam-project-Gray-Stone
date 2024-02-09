@@ -22,8 +22,6 @@
 //   /nusim/reset: std_srvs/srv/Empty
 //   /nusim/teleport: nusim/srv/Teleport
 
-#include <algorithm>
-#include <nuturtlebot_msgs/msg/detail/wheel_commands__struct.hpp>
 #include <rclcpp/parameter_value.hpp>
 #include <rclcpp/subscription.hpp>
 #include <rmw/qos_profiles.h>
@@ -53,21 +51,13 @@
 #include "nusim/srv/teleport.hpp"
 
 #include <geometry_msgs/msg/pose_with_covariance.hpp>
-// using namespace std::chrono_literals;
-namespace {
+#include "leo_ros_utils/param_helper.hpp"
 
+namespace {
 std::string kWorldFrame = "nusim/world";
-//! @brief Generate param descriptor object
-//! @param name name of the parameter
-//! @param description description of the parameter
-//! @return constructed descriptor.
-auto GenParamDescriptor(std::string name, std::string description) {
-  auto desc = rcl_interfaces::msg::ParameterDescriptor();
-  desc.name = name;
-  desc.description = description;
-  return desc;
 }
-} // namespace
+
+
 
 //! @brief This class is the nusim node itself. Holds everything the node needs.
 class NuSim : public rclcpp::Node {

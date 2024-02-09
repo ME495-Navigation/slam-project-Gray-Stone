@@ -16,6 +16,8 @@ find_package(sensor_msgs REQUIRED)
 
 find_package(rclcpp REQUIRED)
 find_package(turtlelib REQUIRED)
+find_package(leo_ros_utils REQUIRED)
+
 find_package(nav_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(tf2 REQUIRED)
