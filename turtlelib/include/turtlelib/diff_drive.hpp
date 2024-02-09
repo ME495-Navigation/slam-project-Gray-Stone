@@ -1,6 +1,5 @@
 #ifndef TURTLELIB_DIFF_DRIVE_HPP_INCLUDE_GUARD
 #define TURTLELIB_DIFF_DRIVE_HPP_INCLUDE_GUARD
-#include "turtlelib/geometry2d.hpp"
 #include "turtlelib/se2d.hpp"
 
 namespace turtlelib {

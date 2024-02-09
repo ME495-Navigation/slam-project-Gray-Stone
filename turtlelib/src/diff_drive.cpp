@@ -12,6 +12,8 @@ WheelConfig &WheelConfig::operator+=(const WheelConfig &rhs) {
   return (*this);
 }
 
+// error: ambiguous overload for ‘operator+’ (operand types are ‘turtlelib::WheelConfig’ and ‘turtlelib::WheelVelocity’ {aka ‘turtlelib::WheelConfig
+// When const ref the argument to this. On += operation.
 WheelConfig operator+(WheelConfig lhs, WheelConfig rhs) {
   return WheelConfig{lhs.left + rhs.left, lhs.right + rhs.right};
 }

@@ -20,8 +20,37 @@ namespace turtlelib {
 TEST_CASE("WheelConfig") {
   WheelConfig config1{1.0, 2.4};
   WheelConfig delta_config{0.1, -0.4};
-  config1 += delta_config;
-  REQUIRE_THAT(config1, WheelConfigWithinRel({1.1, 2.0}));
+  WheelConfig config2{5.5, 10.1};
+  WheelConfig config3{0.1, 0.2};
+
+  SECTION("Addition") {
+
+    REQUIRE_THAT(config1 + delta_config, WheelConfigWithinRel({1.1, 2.0}));
+
+    REQUIRE_THAT(delta_config + config2, WheelConfigWithinRel({5.6, 9.7}));
+    REQUIRE_THAT(delta_config + config3, WheelConfigWithinRel({0.2, -0.2}));
+
+    REQUIRE_THAT(config1 + config2 + config3,
+                 WheelConfigWithinRel({1.0 + 5.5 + 0.1, 2.4 + 10.1 + 0.2}));
+  }
+
+  SECTION("Self increment") {
+    config1 += delta_config;
+    CAPTURE(config1);
+    REQUIRE_THAT(config1, WheelConfigWithinRel({1.1, 2.0}));
+  }
+
+  SECTION("Subtraction") {
+    REQUIRE_THAT((delta_config - config1), WheelConfigWithinRel({-0.9, -2.8}));
+    REQUIRE_THAT((config1 - delta_config), WheelConfigWithinRel({0.9, 2.8}));
+  }
+
+  SECTION("Mutiplication") {
+    REQUIRE_THAT(config1 * 10, WheelConfigWithinRel({1.0 * 10, 2.4 * 10}));
+    REQUIRE_THAT(config1 * 0.1, WheelConfigWithinRel({1.0 * 0.1, 2.4 * 0.1}));
+    REQUIRE_THAT(3.0 * delta_config,
+                 WheelConfigWithinRel({0.1 * 3.0, -0.4 * 3.0}));
+  }
 }
 
 TEST_CASE("FK") {
