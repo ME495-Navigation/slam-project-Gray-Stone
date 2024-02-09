@@ -9,7 +9,7 @@ namespace {
 //! @param prompt prompt to display before reading cin
 //! @return the object T constructed using input
 template <typename T> T ErrorCheckPromptedInput(std::string prompt) {
-  // Citation ---------- [3] ----------
+  // ############# Begin Citation [3]#############
   T out;
   std::cout << prompt;
   std::cin >> out;
@@ -26,7 +26,7 @@ template <typename T> T ErrorCheckPromptedInput(std::string prompt) {
     std::cin >> out;
   }
   return out;
-  // End of citation ---------- [3] ----------
+  // ############# End Citation [3]#############
 }
 } // namespace
 

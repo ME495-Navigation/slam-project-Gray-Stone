@@ -1,4 +1,3 @@
- 
 # Lines that begin with a # are comments
 # set the minimum required version of cmake, usually the first line
 cmake_minimum_required(VERSION 3.22)
@@ -8,7 +7,6 @@ cmake_minimum_required(VERSION 3.22)
 project(turtlelib)
 
 find_package(Doxygen)
-
 
 option(BUILD_DOCS "Build the documentation" OFF)
 
@@ -51,6 +49,11 @@ target_link_libraries(frame_main turtlelib)
 # and paths to th locations of header files
 # target_link_libraries(Name turtlelib)
 
+# ********** Necessary Sections for exporting ***********
+# For other cmake projects to find and link againt this through:
+# target_link_libraries(SOME_TARGET turtlelib::turtlelib)
+# The following three install actions are necessary.
+
 # install the include files by copying the whole include directory
 install(DIRECTORY include/turtlelib DESTINATION include)
 
@@ -68,11 +71,11 @@ install(TARGETS turtlelib EXPORT turtlelib-targets)
 # A user can then target_link_libraries(target project_name::library)
 # to use the libraries installed here
 install(EXPORT turtlelib-targets
-        FILE turtlelib-config.cmake
-        NAMESPACE turtlelib::
-        DESTINATION lib/cmake/${PROJECT_NAME})
+    FILE turtlelib-config.cmake
+    NAMESPACE turtlelib::
+    DESTINATION lib/cmake/${PROJECT_NAME})
 
-
+# ********** END Necessary Sections for exporting ***********
 include(CTest)
 
 # CTest sets BUILD_TESTING to on. To disable tests add -DBUILD_TESTING=OFF when invoking cmake
@@ -98,7 +101,6 @@ if(BUILD_TESTING)
     add_test(NAME diff_drive_test COMMAND test_diff_drive)
     add_test(NAME test_svg COMMAND test_svg)
 endif()
-
 
 if(${DOXYGEN_FOUND} AND ${BUILD_DOCS})
     # Turn the README.md into the homepage of the doxygen docs

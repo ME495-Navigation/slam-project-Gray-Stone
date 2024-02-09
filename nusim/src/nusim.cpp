@@ -22,8 +22,7 @@
 //   /nusim/reset: std_srvs/srv/Empty
 //   /nusim/teleport: nusim/srv/Teleport
 
-#include <algorithm>
-#include <nuturtlebot_msgs/msg/detail/wheel_commands__struct.hpp>
+
 #include <rclcpp/parameter_value.hpp>
 #include <rclcpp/subscription.hpp>
 #include <rmw/qos_profiles.h>
@@ -35,6 +34,8 @@
 #include <functional>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <memory>
+#include <nuturtlebot_msgs/msg/sensor_data.hpp>
+#include <nuturtlebot_msgs/msg/wheel_commands.hpp>
 #include <optional>
 #include <rclcpp/qos.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -42,152 +43,74 @@
 #include <std_msgs/msg/u_int64.hpp>
 #include <std_srvs/srv/empty.hpp>
 #include <string>
+#include <turtlelib/diff_drive.hpp>
 #include <turtlelib/geometry2d.hpp>
 #include <turtlelib/se2d.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
-#include <nuturtlebot_msgs/msg/wheel_commands.hpp>
-#include <nuturtlebot_msgs/msg/sensor_data.hpp>
-#include <turtlelib/diff_drive.hpp>
 
 #include "nusim/srv/teleport.hpp"
 
+#include "leo_ros_utils/param_helper.hpp"
 #include <geometry_msgs/msg/pose_with_covariance.hpp>
-// using namespace std::chrono_literals;
-namespace {
 
+namespace {
 std::string kWorldFrame = "nusim/world";
-//! @brief Generate param descriptor object
-//! @param name name of the parameter
-//! @param description description of the parameter
-//! @return constructed descriptor.
-auto GenParamDescriptor(std::string name, std::string description) {
-  auto desc = rcl_interfaces::msg::ParameterDescriptor();
-  desc.name = name;
-  desc.description = description;
-  return desc;
 }
-} // namespace
+
+using leo_ros_utils::GetParam;
 
 //! @brief This class is the nusim node itself. Holds everything the node needs.
 class NuSim : public rclcpp::Node {
 public:
   NuSim()
-      : Node("nusim"), time_step_(0)
-  // TODO(LEO) I hope to init these param properly, but ros param is only
-  // accessible after node is made. x0(x_init), y0(y_init), theta0(theta_init),
-  // current_x(x_init), current_y(y_init), current_theta(theta_init)
-  // TODO (LEO) This above has been done by nuturtle_control. Need to find a
-  // good time to convert over.
+      : Node("nusim"),
+        update_period(std::chrono::milliseconds(
+            1000 / GetParam<int>(*this, "rate", "The rate of simulator", 200))),
+        x0(GetParam<double>(*this, "x0", "inital robot x location")),
+        y0(GetParam<double>(*this, "y0", "inital robot y location")),
+        theta0(GetParam<double>(*this, "theta0", "initial robot theta")),
+        motor_cmd_max(GetParam<int>(*this, "motor_cmd_max", "radius of wheel")),
+        motor_cmd_per_rad_sec(
+            GetParam<double>(*this, "motor_cmd_per_rad_sec",
+                             "motor cmd per rad/s (actually the inverse)")),
+        encoder_ticks_per_rad(GetParam<double>(*this, "encoder_ticks_per_rad",
+                                               "encoder_ticks_per_rad")),
+        red_bot(turtlelib::DiffDrive{
+            GetParam<double>(*this, "track_width",
+                             "robot center to wheel-track distance"),
+            GetParam<double>(*this, "wheel_radius", "wheel radius"),
+            turtlelib::Transform2D{{x0, y0}, theta0}})
   {
-    // Parameters
-    declare_parameter<int>(
-      "rate", 200, GenParamDescriptor("rate", "The rate of main timer"));
-    const int rate = get_parameter("rate").as_int();
-
-
-  update_period = std::chrono::milliseconds(1000 / rate);
-
-
-    declare_parameter<double>("x0", 0.0,
-                              GenParamDescriptor("x0", "Initial x position"));
-    x0 = get_parameter("x0").as_double();
-    declare_parameter<double>("y0", 0.0,
-                              GenParamDescriptor("y0", "Initial y position"));
-    y0 = get_parameter("y0").as_double();
-    declare_parameter<double>(
-        "theta0", 0.0, GenParamDescriptor("theta0", "Initial z position"));
-    theta0 = get_parameter("theta0").as_double();
 
     // Arena wall stuff
-    declare_parameter<double>(
-        "arena_x_length", 5.0,
-        GenParamDescriptor("arena_x_length", "x length of arena"));
-    const double arena_x_length = get_parameter("arena_x_length").as_double();
-    declare_parameter<double>(
-        "arena_y_length", 3.0,
-        GenParamDescriptor("arena_y_length", "x length of arena"));
-    const double arena_y_length = get_parameter("arena_y_length").as_double();
+    const double arena_x_length =
+        GetParam<double>(*this, "arena_x_length", "x length of arena", 5.0);
+    const double arena_y_length =
+        GetParam<double>(*this, "arena_y_length", "x length of arena", 3.0);
 
     PublishArenaWalls(arena_x_length, arena_y_length);
 
     // obstacle stuff
-    declare_parameter<std::vector<double>>(
-        "obstacles/x",
-        GenParamDescriptor("obstacles/x", "list of obstacle's x coord"));
-    const std::vector<double> obstacles_x =
-        get_parameter("obstacles/x").as_double_array();
-    declare_parameter<std::vector<double>>(
-        "obstacles/y",
-        GenParamDescriptor("obstacles/y", "list of obstacle's y coord"));
-    const std::vector<double> obstacles_y =
-        get_parameter("obstacles/y").as_double_array();
-    declare_parameter<double>(
-        "obstacles/r", GenParamDescriptor("obstacles/r", "obstacle radius"));
-    const double obstacles_r = get_parameter("obstacles/r").as_double();
+    std::cout<<"Doing array stuff" << std::endl;
 
+    const std::vector<double> obstacles_x = GetParam<std::vector<double>>(
+        *this, "obstacles/x", "list of obstacle's x coord");
+    const std::vector<double> obstacles_y = GetParam<std::vector<double>>(
+        *this, "obstacles/y", "list of obstacle's y coord");
+    const double obstacles_r =
+        GetParam<double>(*this, "obstacles/r", "obstacle radius");
     if (obstacles_x.size() != obstacles_y.size()) {
       RCLCPP_ERROR(get_logger(), "Mismatch obstacle x y numbers");
       exit(1);
     }
     PublishObstacles(obstacles_x, obstacles_y, obstacles_r);
 
-    // Robot parameters
-
-    declare_parameter<double>(
-      "wheel_radius",
-      rclcpp::PARAMETER_DOUBLE,
-      GenParamDescriptor("wheel_radius", "radius of wheel"));
-    const double wheel_radius = get_parameter("wheel_radius").as_double();
-
-    if (wheel_radius == rclcpp::PARAMETER_DOUBLE) {
-      RCLCPP_ERROR_STREAM(get_logger(), "Missing parameter wheel_radius");
-      throw std::invalid_argument("Bad parameters");
-    }
-    declare_parameter<double>("track_width",
-                              rclcpp::PARAMETER_DOUBLE,
-                              GenParamDescriptor("track_width", "track width"));
-    const double track_width = get_parameter("track_width").as_double();
-    if (track_width == rclcpp::PARAMETER_DOUBLE) {
-      RCLCPP_ERROR_STREAM(get_logger(), "Missing parameter track_width");
-      throw std::invalid_argument("Bad parameters");
-    }
-    declare_parameter<int>(
-      "motor_cmd_max",
-      rclcpp::PARAMETER_INTEGER,
-      GenParamDescriptor("motor_cmd_max", "radius of wheel"));
-    const int motor_cmd_max = get_parameter("motor_cmd_max").get_value<int>();
-
-    if (motor_cmd_max == rclcpp::PARAMETER_INTEGER) {
-      RCLCPP_ERROR_STREAM(get_logger(), "Missing parameter motor_cmd_max");
-      throw std::invalid_argument("Bad parameters");
-    }
-    declare_parameter<double>("motor_cmd_per_rad_sec",
-                              rclcpp::PARAMETER_DOUBLE,
-                              GenParamDescriptor("motor_cmd_per_rad_sec", "track width"));
-    motor_cmd_per_rad_sec = get_parameter("motor_cmd_per_rad_sec").as_double();
-    if (motor_cmd_per_rad_sec == rclcpp::PARAMETER_DOUBLE) {
-      RCLCPP_ERROR_STREAM(get_logger(), "Missing parameter motor_cmd_per_rad_sec");
-      throw std::invalid_argument("Bad parameters");
-    }
-    declare_parameter<double>("encoder_ticks_per_rad",
-                              rclcpp::PARAMETER_DOUBLE,
-                              GenParamDescriptor("encoder_ticks_per_rad", "track width"));
-    encoder_ticks_per_rad = get_parameter("encoder_ticks_per_rad").as_double();
-    if (encoder_ticks_per_rad == rclcpp::PARAMETER_DOUBLE) {
-      RCLCPP_ERROR_STREAM(get_logger(), "Missing parameter encoder_ticks_per_rad");
-      throw std::invalid_argument("Bad parameters");
-    }
-
-    // Rest of init
-    red_bot = std::make_unique<turtlelib::DiffDrive>(
-      track_width, wheel_radius, turtlelib::Transform2D{ { x0, y0 }, theta0 });
-
     // Setup pub/sub and srv/client
     time_step_publisher_ =
         create_publisher<std_msgs::msg::UInt64>("~/timestep", 10);
-    red_sensor_publisher_ =
-        create_publisher<nuturtlebot_msgs::msg::SensorData>("red/sensor_data", 10);
+    red_sensor_publisher_ = create_publisher<nuturtlebot_msgs::msg::SensorData>(
+        "red/sensor_data", 10);
 
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
@@ -200,14 +123,12 @@ public:
                                 std::placeholders::_1, std::placeholders::_2));
 
     // Setup timer and set things in motion.
-    main_timer_ =
-        this->create_wall_timer(update_period,
-                                std::bind(&NuSim::main_timer_callback, this));
-    wheel_cmd_listener_ = create_subscription<nuturtlebot_msgs::msg::WheelCommands>(
-        "red/wheel_cmd", 10,
-        std::bind(&NuSim::WheelCmdCb, this, std::placeholders::_1));
-
-
+    main_timer_ = this->create_wall_timer(
+        update_period, std::bind(&NuSim::main_timer_callback, this));
+    wheel_cmd_listener_ =
+        create_subscription<nuturtlebot_msgs::msg::WheelCommands>(
+            "red/wheel_cmd", 10,
+            std::bind(&NuSim::WheelCmdCb, this, std::placeholders::_1));
   }
 
 private:
@@ -220,18 +141,17 @@ private:
 
     // Let's move the red bot
 
-    // Why I get warning saying int to double is narrowing conversion? 
+    // Why I get warning saying int to double is narrowing conversion?
     turtlelib::WheelVelocity vel = {
-      static_cast<double>(latest_wheel_cmd.left_velocity),
-      static_cast<double>(latest_wheel_cmd.right_velocity)
-    };
+        static_cast<double>(latest_wheel_cmd.left_velocity),
+        static_cast<double>(latest_wheel_cmd.right_velocity)};
 
     // Directly using duration constructor does work! (default std::ratio is
     // 1:1) Proof here : https://godbolt.org/z/TxMMqvrKh
     double period_sec = std::chrono::duration<double>(update_period).count();
-    red_bot->UpdateBodyConfigWithVel(vel * motor_cmd_per_rad_sec * period_sec);
+    red_bot.UpdateBodyConfigWithVel(vel * motor_cmd_per_rad_sec * period_sec);
 
-    auto new_wheel_config = red_bot->GetWheelConfig();
+    auto new_wheel_config = red_bot.GetWheelConfig();
     if (std::abs(new_wheel_config.left - old_wheel_config.left) >
             turtlelib::PI ||
         std::abs(new_wheel_config.right - old_wheel_config.right) >
@@ -246,7 +166,8 @@ private:
 
     nuturtlebot_msgs::msg::SensorData red_sensor_msg;
     red_sensor_msg.left_encoder = encoder_ticks_per_rad * new_wheel_config.left;
-    red_sensor_msg.right_encoder = encoder_ticks_per_rad * new_wheel_config.right;
+    red_sensor_msg.right_encoder =
+        encoder_ticks_per_rad * new_wheel_config.right;
     red_sensor_msg.stamp = get_clock()->now();
     red_sensor_publisher_->publish(red_sensor_msg);
 
@@ -254,20 +175,18 @@ private:
     time_step_publisher_->publish(msg);
 
     // Publish TF for red robot
-    auto tf = Gen2DTransform(
-      red_bot->GetBodyConfig(), kWorldFrame, "red/base_footprint");
+    auto tf = Gen2DTransform(red_bot.GetBodyConfig(), kWorldFrame,
+                             "red/base_footprint");
     tf_broadcaster_->sendTransform(tf);
-
   }
 
   //! @brief service callback for reset
   //! @param / service request (not used)
   //! @param / service respond (not used)
   void reset_srv(const std_srvs::srv::Empty::Request::SharedPtr,
-                 std_srvs::srv::Empty::Response::SharedPtr)
-  {
+                 std_srvs::srv::Empty::Response::SharedPtr) {
     time_step_ = 0;
-    red_bot->SetBodyConfig({ { x0, y0 }, theta0 });
+    red_bot.SetBodyConfig({{x0, y0}, theta0});
     return;
   }
 
@@ -275,13 +194,12 @@ private:
   //! @param req teleport request data
   //! @param / service response, not used
   void teleport_callback(const nusim::srv::Teleport::Request::SharedPtr req,
-                         nusim::srv::Teleport::Response::SharedPtr)
-  {
-    red_bot->SetBodyConfig({ { req->x, req->y }, req->theta });
+                         nusim::srv::Teleport::Response::SharedPtr) {
+    red_bot.SetBodyConfig({{req->x, req->y}, req->theta});
     return;
   }
 
-  void WheelCmdCb(const nuturtlebot_msgs::msg::WheelCommands& msg) {
+  void WheelCmdCb(const nuturtlebot_msgs::msg::WheelCommands &msg) {
     latest_wheel_cmd = msg;
   }
 
@@ -298,12 +216,10 @@ private:
   //! @param child_frame_id frame name for child
   //! @param time_stamp_opt optional time stamp (default to current time)
   //! @return a populated TransformStamped object from given infos.
-  geometry_msgs::msg::TransformStamped Gen2DTransform(
-    turtlelib::Transform2D trans2d,
-    std::string parent_frame_id,
-    std::string child_frame_id,
-    std::optional<rclcpp::Time> time_stamp_opt = std::nullopt)
-  {
+  geometry_msgs::msg::TransformStamped
+  Gen2DTransform(turtlelib::Transform2D trans2d, std::string parent_frame_id,
+                 std::string child_frame_id,
+                 std::optional<rclcpp::Time> time_stamp_opt = std::nullopt) {
 
     geometry_msgs::msg::TransformStamped tf_stamped;
     tf_stamped.header.stamp = time_stamp_opt.value_or(get_clock()->now());
@@ -415,25 +331,33 @@ private:
   }
 
   // Private Members
-  //! atomic prevent timer and service call modify this together
-  std::atomic<uint64_t> time_step_ = 0;
-  std::chrono::nanoseconds update_period; // period for each cycle of update
-  double x0 = 0;            // Init x location
-  double y0 = 0;            // Init y location
-  double theta0 = 0;        // Init theta location
 
-  nuturtlebot_msgs::msg::WheelCommands latest_wheel_cmd;
-  std::unique_ptr<turtlelib::DiffDrive> red_bot;
+  // Ros Params
+  std::chrono::nanoseconds update_period; // period for each cycle of update
+  double x0 = 0;                          // Init x location
+  double y0 = 0;                          // Init y location
+  double theta0 = 0;                      // Init theta location
+
+  int motor_cmd_max;
   double motor_cmd_per_rad_sec;
   double encoder_ticks_per_rad;
+  turtlelib::DiffDrive red_bot;
+
+  // These are member variable
+  std::atomic<uint64_t> time_step_ = 0;
   turtlelib::WheelConfig old_wheel_config;
-  // Private ros members
+  nuturtlebot_msgs::msg::WheelCommands latest_wheel_cmd;
+
+  // Ros objects
   rclcpp::TimerBase::SharedPtr main_timer_;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr reset_service_;
   rclcpp::Service<nusim::srv::Teleport>::SharedPtr teleport_service_;
   rclcpp::Publisher<std_msgs::msg::UInt64>::SharedPtr time_step_publisher_;
-  rclcpp::Publisher<nuturtlebot_msgs::msg::SensorData>::SharedPtr red_sensor_publisher_;
-  rclcpp::Subscription<nuturtlebot_msgs::msg::WheelCommands>::SharedPtr wheel_cmd_listener_;
+  rclcpp::Publisher<nuturtlebot_msgs::msg::SensorData>::SharedPtr
+      red_sensor_publisher_;
+  rclcpp::Subscription<nuturtlebot_msgs::msg::WheelCommands>::SharedPtr
+      wheel_cmd_listener_;
+
   // The publisher need to be kept so the transient local message can still be
   // available later
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
@@ -442,7 +366,6 @@ private:
       obstacle_publisher_;
 
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
-
 };
 
 //! @brief Main entry point for the nusim node

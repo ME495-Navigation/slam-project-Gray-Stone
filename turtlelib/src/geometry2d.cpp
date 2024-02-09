@@ -4,8 +4,9 @@
 namespace turtlelib {
 
 double normalize_angle(double rad) {
-  // Citation ---------- [2] ----------
+  // ############# Begin Citation [3]#############
   return rad - (std::ceil((rad + PI) / (2.0 * PI)) - 1.0) * 2.0 * PI;
+  // ############# End Citation [3]#############
 }
 std::ostream &operator<<(std::ostream &os, const Point2D &p) {
   os << "[" << p.x << " " << p.y << "]";
@@ -104,12 +105,12 @@ double dot(const Vector2D &v1, const Vector2D &v2) {
 
 double angle(const Vector2D &v1, const Vector2D &v2) {
 
-  // Citation ----------[4]----------
-  //     dot = x1*x2 + y1*y2      # Dot product between [x1, y1] and [x2, y2]
+  // ############# Begin Citation [3]#############
+  // angle = atan2(det, dot)  # atan2(y, x) or atan2(sin, cos)
   // det = x1*y2 - y1*x2      # Determinant
   double det = v1.x * v2.y - v1.y * v2.x;
-  // angle = atan2(det, dot)  # atan2(y, x) or atan2(sin, cos)
   return atan2(det, dot(v1, v2));
+  // ############# End Citation [3]#############
 }
 
 } // namespace turtlelib

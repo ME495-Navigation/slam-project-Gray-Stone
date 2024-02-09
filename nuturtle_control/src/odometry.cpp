@@ -1,5 +1,3 @@
-#include "nuturtle_control/ros_math_helper.hpp"
-#include "nuturtle_control/ros_param_helper.hpp"
 #include "nuturtle_control/srv/detail/init_pose__struct.hpp"
 #include <cstddef>
 #include <geometry_msgs/msg/detail/transform__struct.hpp>
@@ -29,20 +27,22 @@
 #include <turtlelib/se2d.hpp>
 #include <nuturtle_control/srv/init_pose.hpp>
 
-using leo_ros_helper::GetParam;
-using leo_ros_helper::GetParamStr;
+#include <leo_ros_utils/param_helper.hpp>
+#include <leo_ros_utils/math_helper.hpp>
+
+using leo_ros_utils::GetParam;
 
 class Odometry : public rclcpp::Node {
 public:
   Odometry()
       : Node("odometry"),
-        body_id(GetParamStr(*this, "body_id", "name of the body frame")),
-        odom_id(GetParamStr(*this, "odom_id", "name of the odometry frame",
+        body_id(GetParam<std::string>(*this, "body_id", "name of the body frame")),
+        odom_id(GetParam<std::string>(*this, "odom_id", "name of the odometry frame",
                             "odom")),
         wheel_left(
-            GetParamStr(*this, "wheel_left", "name of left wheel joint")),
+            GetParam<std::string>(*this, "wheel_left", "name of left wheel joint")),
         wheel_right(
-            GetParamStr(*this, "wheel_right", "name of right wheel joint")),
+            GetParam<std::string>(*this, "wheel_right", "name of right wheel joint")),
         wheel_radius(
             GetParam<double>(*this, "wheel_radius", "Radius of wheel")),
         track_width(GetParam<double>(*this, "track_width",
@@ -83,7 +83,7 @@ public:
     odom_msg.header.frame_id = odom_id;
     odom_msg.child_frame_id = body_id;
 
-    odom_msg.pose.pose = leo_ros_helper::Convert(bot_tf);
+    odom_msg.pose.pose = leo_ros_utils::Convert(bot_tf);
 
     odom_msg.twist.twist.linear.x =
         (bot_tf.translation().x - last_stamped_tf2d.second.translation().x) /
@@ -100,7 +100,7 @@ public:
     tf_stamped.header.frame_id = odom_id;
     tf_stamped.child_frame_id = body_id;
     tf_stamped.header.stamp = msg.header.stamp;
-    tf_stamped.transform = leo_ros_helper::Convert(odom_msg.pose.pose);
+    tf_stamped.transform = leo_ros_utils::Convert(odom_msg.pose.pose);
 
     tf_broadcaster.sendTransform(tf_stamped);
     last_stamped_tf2d = std::pair{current_time, bot_tf};

@@ -14,6 +14,7 @@ find_package(std_srvs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(nuturtlebot_msgs REQUIRED)
 find_package(turtlelib REQUIRED)
+find_package(leo_ros_utils REQUIRED)
 
 find_package(visualization_msgs REQUIRED)
 
@@ -30,6 +31,7 @@ rosidl_generate_interfaces(
   # this case geometry_msgs for Sphere.msg
 )
 
+# NOTE:
 # LIBRARY_NAME ${PROJECT_NAME} # This is a necessary line, Otherweise will get
 # This error:
 #
@@ -62,7 +64,8 @@ ament_target_dependencies(
   tf2_ros
   visualization_msgs
   nuturtlebot_msgs
-  turtlelib)
+  leo_ros_utils
+  )
 target_link_libraries(nusim ${cpp_typesupport_target} turtlelib::turtlelib)
 install(TARGETS nusim DESTINATION lib/${PROJECT_NAME})
 
