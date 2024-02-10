@@ -22,6 +22,7 @@
 //   /nusim/reset: std_srvs/srv/Empty
 //   /nusim/teleport: nusim/srv/Teleport
 
+
 #include <rclcpp/parameter_value.hpp>
 #include <rclcpp/subscription.hpp>
 #include <rmw/qos_profiles.h>
@@ -58,8 +59,6 @@ std::string kWorldFrame = "nusim/world";
 }
 
 using leo_ros_utils::GetParam;
-using leo_ros_utils::GetParamStr;
-using leo_ros_utils::GetParamThrowCatch;
 
 //! @brief This class is the nusim node itself. Holds everything the node needs.
 class NuSim : public rclcpp::Node {
@@ -93,9 +92,11 @@ public:
     PublishArenaWalls(arena_x_length, arena_y_length);
 
     // obstacle stuff
-    const std::vector<double> obstacles_x = GetParamThrowCatch<double>(
+    std::cout<<"Doing array stuff" << std::endl;
+
+    const std::vector<double> obstacles_x = GetParam<std::vector<double>>(
         *this, "obstacles/x", "list of obstacle's x coord");
-    const std::vector<double> obstacles_y = GetParamThrowCatch<double>(
+    const std::vector<double> obstacles_y = GetParam<std::vector<double>>(
         *this, "obstacles/y", "list of obstacle's y coord");
     const double obstacles_r =
         GetParam<double>(*this, "obstacles/r", "obstacle radius");

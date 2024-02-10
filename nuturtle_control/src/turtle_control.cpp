@@ -17,9 +17,9 @@
 #include <turtlelib/diff_drive.hpp>
 #include <turtlelib/se2d.hpp>
 
-#include "nuturtle_control/ros_param_helper.hpp"
+#include <leo_ros_utils/param_helper.hpp>
 
-using leo_ros_helper::GetParam ;
+using leo_ros_utils::GetParam;
 
 class TurtleControl : public rclcpp::Node {
 

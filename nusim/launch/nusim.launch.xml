@@ -10,6 +10,8 @@
 
     <node pkg="nusim" exec="nusim" output="screen">
         <param from="$(var config_file)" />
+        <!-- This is also needed now. -->
+        <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
     </node>
 
     <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share nusim)/config/nusim.rviz"
