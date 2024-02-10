@@ -1,7 +1,8 @@
 #include "leo_ros_utils/param_helper.hpp"
 #include <rclcpp/parameter_value.hpp>
+#include <turtlelib/to_string.hpp>
 
-namespace leo_ros_helper {
+namespace leo_ros_utils {
 
 std::string
 GetParamStr(rclcpp::Node &ros_node, std::string name, std::string description,
@@ -23,8 +24,12 @@ GetParamStr(rclcpp::Node &ros_node, std::string name, std::string description,
       return val;
     } catch (rclcpp::exceptions::ParameterUninitializedException&) {
       RCLCPP_ERROR_STREAM(ros_node.get_logger(), "Missing parameter " << name);
-      throw std::invalid_argument("Bad parameters");
+
+      throw std::invalid_argument(turtlelib::ToString() << "Bad parameters" << name);
     }
   }
 }
+
+
+
 } // namespace leo_ros_helper

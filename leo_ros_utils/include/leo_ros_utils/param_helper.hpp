@@ -5,8 +5,8 @@
 #include <rclcpp/parameter_value.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <stdexcept>
-
-namespace leo_ros_helper {
+#include <turtlelib/to_string.hpp>
+namespace leo_ros_utils {
 
 template <typename T>
 T GetParam(rclcpp::Node &ros_node, std::string name, std::string description,
@@ -26,6 +26,29 @@ T GetParam(rclcpp::Node &ros_node, std::string name, std::string description,
     }
     return val;
   }
+}
+
+template <typename T>
+std::vector<T> GetParamThrowCatch(rclcpp::Node &ros_node, std::string name, std::string description,
+           std::optional<std::vector<T>> default_value = std::nullopt) {
+  auto desc = rcl_interfaces::msg::ParameterDescriptor();
+  desc.name = name;
+  desc.description = description;
+  if (default_value.has_value()) {
+    ros_node.declare_parameter<std::vector<T>>(name, default_value.value(), desc);
+    return ros_node.get_parameter(name).get_value<std::vector<T>>();
+  } else {
+    ros_node.declare_parameter(name, rclcpp::PARAMETER_INTEGER_ARRAY, desc);
+    
+    try {
+
+      std::vector<T> val = ros_node.get_parameter(name).get_value<std::vector<T>>();
+      return val;
+    } catch (rclcpp::exceptions::ParameterUninitializedException&) {
+      RCLCPP_ERROR_STREAM(ros_node.get_logger(), "Missing parameter " << name);
+
+      throw std::invalid_argument(turtlelib::ToString() << "Bad parameters" << name);
+    }  }
 }
 
 // The Rclcpp parameter is initially DESIGNED TO NOT SUPPORT NON_OPTIONAL

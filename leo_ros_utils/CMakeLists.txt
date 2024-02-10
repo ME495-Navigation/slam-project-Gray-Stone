@@ -17,6 +17,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(Doxygen)
 option(BUILD_DOCS "Build the documentation" OFF)
 
+# *************** BUILD  
 # Define the library
 add_library(leo_ros_utils src/param_helper.cpp src/math_helper.cpp)
 target_include_directories(
@@ -25,39 +26,22 @@ target_include_directories(
   $<INSTALL_INTERFACE:include/>)
   
   # Ros librarys
-ament_target_dependencies(leo_ros_utils rclcpp geometry_msgs tf2)
-target_compile_features(leo_ros_utils PUBLIC cxx_std_17)
+  ament_target_dependencies(leo_ros_utils rclcpp geometry_msgs tf2)
+  target_compile_features(leo_ros_utils PUBLIC cxx_std_17)
+  # Turtlelib is not a ament target, thus included in this way.
+  target_link_libraries(leo_ros_utils turtlelib::turtlelib)
+# *************** END BUILD 
 
-# Turtlelib is not a ament target, thus included in this way.
-target_link_libraries(leo_ros_utils turtlelib::turtlelib)
-
-# For other packages to find it by cmake
-# find package and target_link_libraries(SOME_TARGET leo_utils::leo_ros_utils)
-# The following 3 sections are needed.
-# However, since this is also a ament cmake package. Simply do
-# ament_target_dependencies(SOME_TARGET leo_ros_utils) also works.
-
+# *************** INSTALL
 # install the include files by copying the whole include directory
 # For other ament cmake ros package, this includes srv, launch, config, urdf, etc.
 install(DIRECTORY include/leo_ros_utils DESTINATION include)
 
-# Create a CMake Exported Target containing the lib and exe.
-# Also create CMake Export called projet_name-targets
-# The CMake Export contains files that allow other CMake projects
-# to find this project. It must be installed separately.
-install(TARGETS ${PROJECT_NAME} EXPORT ${PROJECT_NAME}-targets)
-
-# The project_name-targets created by install(TARGETS) needs to be installed.
-# install(EXPORT ...) will generate a file called project_name-config.cmake
-# that contains the exported targets.
-# After installation this file will then be found when calling
-# find_package(project_name) from another cmake project
-# A user can then target_link_libraries(target project_name::library)
-# to use the libraries installed here
-install(EXPORT ${PROJECT_NAME}-targets
-  FILE ${PROJECT_NAME}-config.cmake
-  NAMESPACE leo_utils::
-  DESTINATION lib/cmake/${PROJECT_NAME})
+# These three lines are how to make a ament package find-able by others. 
+install(TARGETS leo_ros_utils EXPORT export_leo_ros_utils)
+# The folloing line is one commonly missed. 
+ament_export_include_directories("include/leo_ros_utils")
+ament_export_targets(export_leo_ros_utils)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

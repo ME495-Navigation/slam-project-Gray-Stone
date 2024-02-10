@@ -31,6 +31,7 @@ rosidl_generate_interfaces(
   # this case geometry_msgs for Sphere.msg
 )
 
+# NOTE:
 # LIBRARY_NAME ${PROJECT_NAME} # This is a necessary line, Otherweise will get
 # This error:
 #
@@ -62,10 +63,10 @@ ament_target_dependencies(
   tf2
   tf2_ros
   visualization_msgs
+  nuturtlebot_msgs
   leo_ros_utils
   )
-target_link_libraries(nusim ${cpp_typesupport_target} turtlelib::turtlelib leo_utils::leo_ros_utils)
-# target_link_libraries(nusim ${cpp_typesupport_target} turtlelib::turtlelib)
+target_link_libraries(nusim ${cpp_typesupport_target} turtlelib::turtlelib)
 install(TARGETS nusim DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY

@@ -46,7 +46,9 @@ def generate_launch_description() -> LaunchDescription:
             namespace=LaunchConfiguration("color"),
             parameters=[{
                 'robot_description':
-                    ParameterValue(  # Citation: ---------- [1] ----------
+                    ParameterValue(
+                    ############# Begin Citation [1]#############
+
                         Command([
                             ExecutableInPackage("xacro", "xacro"), " ",
                             PathJoinSubstitution([
@@ -55,6 +57,7 @@ def generate_launch_description() -> LaunchDescription:
                             ]), " ", "color:=",
                             LaunchConfiguration("color")
                         ])),
+                    ############# End Citation [1]#############
                 'frame_prefix': [LaunchConfiguration("color"), "/"]
             }]),
         Node(package='joint_state_publisher',
