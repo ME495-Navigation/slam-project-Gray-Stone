@@ -51,8 +51,7 @@ ament_target_dependencies(
   geometry_msgs
   sensor_msgs
   nuturtlebot_msgs
-  leo_ros_utils
-  turtlelib)
+  leo_ros_utils)
 target_link_libraries(turtle_control turtlelib::turtlelib)
 
 add_executable(odometry src/odometry.cpp)
@@ -63,7 +62,6 @@ ament_target_dependencies(
   geometry_msgs
   sensor_msgs
   nuturtlebot_msgs
-  turtlelib
   nav_msgs
   tf2
   leo_ros_utils
@@ -80,7 +78,6 @@ ament_target_dependencies(
   geometry_msgs
   sensor_msgs
   nuturtlebot_msgs
-  turtlelib
   nav_msgs
   tf2
   leo_ros_utils
@@ -93,6 +90,46 @@ install(TARGETS turtle_control odometry circle DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
+  include(CTest)
+  find_package(catch_ros2 REQUIRED)
+
+  # ##########################
+  # # INTEGRATION TEST NODE ##
+  # ##########################
+  add_executable(turtle_control_test test/turtle_control_test.cpp)
+  target_link_libraries(turtle_control_test
+    catch_ros2::catch_ros2_with_node_main)
+
+  ament_target_dependencies(turtle_control_test
+    rclcpp
+    std_srvs
+    geometry_msgs
+    sensor_msgs
+    nuturtlebot_msgs
+    leo_ros_utils
+  )
+
+  install(TARGETS
+    turtle_control_test
+    DESTINATION lib/${PROJECT_NAME}
+  )
+
+  # ################
+  # # LAUNCH FILE ##
+  # ################
+  # This is the launch file that will be used to run the integration test
+  install(FILES
+    test/turtle_control_test.launch.xml # example in XML
+    DESTINATION share/${PROJECT_NAME}
+  )
+
+  # ##################
+  # # Register TEST ##
+  # ##################
+  catch_ros2_add_integration_test(ExampleIntegration_TestXML
+    LAUNCH_FILE turtle_control_test.launch.xml # example in XML
+  )
+
   find_package(ament_lint_auto REQUIRED)
 
   # the following line skips the linter which checks for copyrights comment the

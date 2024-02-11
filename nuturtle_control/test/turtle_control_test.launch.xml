@@ -1,0 +1,18 @@
+<launch>
+
+    <catch2_launch_file description='Catch2 integration test for turtle_control' />
+
+    <node pkg="nuturtle_control" exec="turtle_control" output="screen">
+        <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
+        <param name="recv_timeout" value="2.0"></param>
+    </node>
+
+    <catch2_integration_test_node
+        pkg='nuturtle_control'
+        exec='turtle_control_test'>
+        <!-- Get the same parameter as the nuturtle_control does -->
+        <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
+    </catch2_integration_test_node>
+
+
+</launch>
