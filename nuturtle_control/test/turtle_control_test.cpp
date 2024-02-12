@@ -1,7 +1,11 @@
 
+#include <exception>
 #include <geometry_msgs/msg/twist.hpp>
 #include <memory>
+
+#include <nuturtlebot_msgs/msg/sensor_data.hpp>
 #include <nuturtlebot_msgs/msg/wheel_commands.hpp>
+#include <optional>
 #include <rclcpp/executors.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/subscription.hpp>
@@ -17,6 +21,9 @@
 #include <memory>
 #include <nuturtlebot_msgs/msg/sensor_data.hpp>
 #include <nuturtlebot_msgs/msg/wheel_commands.hpp>
+#include <sensor_msgs/msg/joint_state.hpp>
+
+using Catch::Matchers::VectorContains;
 using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
 using leo_ros_utils::GetParam;
@@ -37,7 +44,7 @@ bool SpinSomeUntil(rclcpp::Node::SharedPtr node,
   return false;
 }
 
-TEST_CASE("wheel cmd test") {
+TEST_CASE("turtle control") {
   // I would like to make it a not shared ptr. But no choise as some
   // ros functions demand a shared pointer style usage.
   rclcpp::Node::SharedPtr probe_node =
@@ -58,13 +65,20 @@ TEST_CASE("wheel cmd test") {
   double encoder_ticks_per_rad =
       GetParam<double>(*probe_node, "encoder_ticks_per_rad",
                        "encoder ticks of wheel per radius");
+  std::string wheel_left_name = GetParam<std::string>(
+      *probe_node, "wheel_left", "joint name of wheel_left");
+  std::string wheel_right_name = GetParam<std::string>(
+      *probe_node, "wheel_right", "joint name of wheel_right");
 
   CAPTURE(recv_timeout);
   geometry_msgs::msg::Twist cmd;
   auto cmd_pub =
       probe_node->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 10);
+  auto sensor_pub =
+      probe_node->create_publisher<nuturtlebot_msgs::msg::SensorData>(
+          "sensor_data", 10);
 
-  SECTION("pure translation") {
+  SECTION("cmd_vel pure translation") {
     // One meter per second cmd
     cmd.linear.x = 0.1;
 
@@ -72,7 +86,12 @@ TEST_CASE("wheel cmd test") {
     auto wheel_rad = (cmd.linear.x / wheel_radius);
     double expected_cmd = wheel_rad / motor_cmd_per_rad_sec;
 
+    // One option is to do:
+
     // rclcpp::wait_for_message(wheel_cmd,wheel_sub,);
+    // However rclcpp's context managing seems quite bad under Catch2's section.
+    // It might be hanging out to the previous receiver or something, the second
+    // section cannot receive any message
     std::optional<nuturtlebot_msgs::msg::WheelCommands> wheel_cmd_opt;
     auto wheel_sub =
         probe_node->create_subscription<nuturtlebot_msgs::msg::WheelCommands>(
@@ -94,7 +113,7 @@ TEST_CASE("wheel cmd test") {
     REQUIRE_THAT(wheel_cmd_opt->right_velocity, WithinAbs(expected_cmd, 1.0));
   }
 
-  SECTION("pure rotation") {
+  SECTION("cmv_vel pure rotation") {
     cmd.angular.z = 0.1;
 
     double track_length = cmd.angular.z * track_width;
@@ -118,23 +137,42 @@ TEST_CASE("wheel cmd test") {
     REQUIRE_THAT(wheel_cmd_opt->left_velocity, WithinAbs(-expected_cmd, 1.0));
     REQUIRE_THAT(wheel_cmd_opt->right_velocity, WithinAbs(+expected_cmd, 1.0));
   }
+
+  SECTION("JointState") {
+    auto sensor_pub =
+        probe_node->create_publisher<nuturtlebot_msgs::msg::SensorData>(
+            "sensor_data", 10);
+
+    std::optional<sensor_msgs::msg::JointState> js_opt;
+    auto js_sub = probe_node->create_subscription<sensor_msgs::msg::JointState>(
+        "joint_states", 10,
+        [&js_opt](const sensor_msgs::msg::JointState &msg) { js_opt = msg; });
+
+    nuturtlebot_msgs::msg::SensorData sensor_cmd;
+    sensor_cmd.left_encoder = 10;
+    sensor_cmd.right_encoder = 200;
+    sensor_pub->publish(sensor_cmd);
+
+    // expected output
+    double left_expected = sensor_cmd.left_encoder / encoder_ticks_per_rad;
+    double right_expected = sensor_cmd.right_encoder / encoder_ticks_per_rad;
+
+    INFO("Wait for joint state update");
+    REQUIRE(
+        SpinSomeUntil(probe_node, recv_timeout, [&]() { return js_opt.has_value(); }));
+    INFO("Done waiting for joint states");
+
+    REQUIRE_THAT(js_opt->name, VectorContains(wheel_left_name));
+    REQUIRE_THAT(js_opt->name, VectorContains(wheel_right_name));
+
+    for (size_t i = 0; i < js_opt->name.size(); ++i) {
+      if (js_opt->name.at(i) == wheel_left_name) {
+        REQUIRE_THAT(js_opt->position.at(i), WithinAbs(left_expected, 0.001));
+      }
+      if (js_opt->name.at(i) == wheel_right_name) {
+        REQUIRE_THAT(js_opt->position.at(i), WithinAbs(right_expected, 0.001));
+      }
+    }
+  }
 }
-
-// // #include <catch2/matchers/catch_matchers.hpp>
-// // #include <catch2/matchers/catch_matchers_floating_point.hpp>
-
-// #include "catch_ros2/catch_ros2.hpp"
-// #include "rclcpp/rclcpp.hpp"
-// #include "std_srvs/srv/empty.hpp"
-// #include <catch2/catch_test_macros.hpp>
-
-// TEST_CASE("example_integration_test", "[integration]") {
-//   // Create a simple client node to check if the auxiliary node
-//   // has a service available
-//   auto node = rclcpp::Node::make_shared("integration_test_node");
-//   auto client = node->create_client<std_srvs::srv::Empty>("test_service");
-
-//   bool found = client->wait_for_service();
-//   CHECK(found);
-
 // }
