@@ -12,6 +12,7 @@
         exec='turtle_control_test'>
         <!-- Get the same parameter as the nuturtle_control does -->
         <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
+        <param name="recv_timeout" value="5.0"></param>
     </catch2_integration_test_node>
 
 
