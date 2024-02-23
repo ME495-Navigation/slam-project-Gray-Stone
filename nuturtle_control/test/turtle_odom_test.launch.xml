@@ -1,0 +1,31 @@
+<launch>
+    <catch2_launch_file description='Catch2 integration test for turtle_control' />
+
+    <node pkg="nuturtle_control" exec="odometry" output="screen" namespace="blue">
+        <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
+        <param name="body_id" value="/blue/base_footprint"/>
+        <!-- <remap from="blud/joint_states"></remap> -->
+
+    </node>
+
+    <catch2_integration_test_node pkg='nuturtle_control' exec='turtle_odom_test' namespace="blue">
+        <!-- Get the same parameter as the nuturtle_control does -->
+        <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
+        <param name="body_id" value="/blue/base_footprint"/>
+
+    </catch2_integration_test_node>
+
+    <include file="$(find-pkg-share nuturtle_description)/launch/load_one.launch.py">
+        <arg name="use_rviz" value="False" />
+        <arg name="color" value="blue" />
+    </include>
+
+    <!-- <node pkg="robot_state_publisher" exec="robot_state_publisher">
+        
+        <param name="robot_description" value="$(command '$(exec-in-pkg xacro xacro) $(find-pkg-share nuturtle_description)/urdf/turtlebot3_burger.urdf.xacro color:=test') " />
+    </node>
+
+    <node pkg="joint_state_publisher" exec="joint_state_publisher">
+    </node> -->
+
+</launch>

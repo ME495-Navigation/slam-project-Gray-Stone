@@ -31,7 +31,7 @@ Vector2D Vector2D::normalize() const {
   return {x / norm, y / norm};
 }
 
-double Vector2D::magnitude() const { return sqrt(x * x + y * y); }
+double Vector2D::magnitude() const { return std::sqrt(x * x + y * y); }
 
 Vector2D operator-(const Point2D &head, const Point2D &tail) {
   return {head.x - tail.x, head.y - tail.y};

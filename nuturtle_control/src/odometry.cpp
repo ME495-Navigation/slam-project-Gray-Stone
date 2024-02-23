@@ -1,3 +1,30 @@
+//! @file odometry calculation node
+//! @brief Generate odometry base on wheel encoder change
+// Parameters:
+//  body_id - string: name of the body frame
+//  odom_id - string: name of the body frame
+//  wheel_left - string: name of left wheel joint
+//  wheel_right - string: name of right wheel joint
+//  wheel_radius - double: wheel radius
+//  track_width - double: distance between body center and wheel track.
+
+// Publishers:
+//  odom - nav_msgs::msg::Odometry : calculated odometry value
+//  tf : odometry frame from body frame
+
+// Subscriber:
+//   joint_states - sensor_msgs::msg::JointState: Joint State of the robot
+
+// Service Server:
+//  initial_pose - nuturtle_control::srv::InitPose : Set the initial pose of the
+//  robot when called.
+
+// General flow of thing
+// on each update of joint_states, update the internal diff bot status, can
+// calculate new odometry data from it. Then publish to odom and tf.
+// When initial_pose is called, the odom reading will directly snap to the
+// provided location.
+
 #include "nuturtle_control/srv/detail/init_pose__struct.hpp"
 #include <cstddef>
 #include <geometry_msgs/msg/detail/transform__struct.hpp>
@@ -9,6 +36,7 @@
 
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
+#include <nuturtle_control/srv/init_pose.hpp>
 #include <nuturtlebot_msgs/msg/sensor_data.hpp>
 #include <nuturtlebot_msgs/msg/wheel_commands.hpp>
 #include <optional>
@@ -25,24 +53,23 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <turtlelib/diff_drive.hpp>
 #include <turtlelib/se2d.hpp>
-#include <nuturtle_control/srv/init_pose.hpp>
 
-#include <leo_ros_utils/param_helper.hpp>
 #include <leo_ros_utils/math_helper.hpp>
+#include <leo_ros_utils/param_helper.hpp>
 
 using leo_ros_utils::GetParam;
 
 class Odometry : public rclcpp::Node {
 public:
   Odometry()
-      : Node("odometry"),
-        body_id(GetParam<std::string>(*this, "body_id", "name of the body frame")),
-        odom_id(GetParam<std::string>(*this, "odom_id", "name of the odometry frame",
-                            "odom")),
-        wheel_left(
-            GetParam<std::string>(*this, "wheel_left", "name of left wheel joint")),
-        wheel_right(
-            GetParam<std::string>(*this, "wheel_right", "name of right wheel joint")),
+      : Node("odometry"), body_id(GetParam<std::string>(
+                              *this, "body_id", "name of the body frame")),
+        odom_id(GetParam<std::string>(*this, "odom_id",
+                                      "name of the odometry frame", "odom")),
+        wheel_left(GetParam<std::string>(*this, "wheel_left",
+                                         "name of left wheel joint")),
+        wheel_right(GetParam<std::string>(*this, "wheel_right",
+                                          "name of right wheel joint")),
         wheel_radius(
             GetParam<double>(*this, "wheel_radius", "Radius of wheel")),
         track_width(GetParam<double>(*this, "track_width",
@@ -56,8 +83,9 @@ public:
     odom_publisher = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
 
     init_pose_srv = create_service<nuturtle_control::srv::InitPose>(
-        "initial_pose", std::bind(&Odometry::init_pose_cb, this,
-                             std::placeholders::_1, std::placeholders::_2));
+        "initial_pose",
+        std::bind(&Odometry::init_pose_cb, this, std::placeholders::_1,
+                  std::placeholders::_2));
   }
 
   void JointStateCb(const sensor_msgs::msg::JointState &msg) {
@@ -109,7 +137,8 @@ public:
   void
   init_pose_cb(const nuturtle_control::srv::InitPose::Request::SharedPtr req,
                nuturtle_control::srv::InitPose::Response::SharedPtr) {
-    diff_bot.SetBodyConfig( turtlelib::Transform2D{{req->x0, req->y0}, req->theta0});
+    diff_bot.SetBodyConfig(
+        turtlelib::Transform2D{{req->x0, req->y0}, req->theta0});
     return;
   }
 

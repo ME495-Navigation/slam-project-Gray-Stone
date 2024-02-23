@@ -99,7 +99,6 @@ if(BUILD_TESTING)
   add_executable(turtle_control_test test/turtle_control_test.cpp)
   target_link_libraries(turtle_control_test
     catch_ros2::catch_ros2_with_node_main)
-
   ament_target_dependencies(turtle_control_test
     rclcpp
     std_srvs
@@ -109,8 +108,26 @@ if(BUILD_TESTING)
     leo_ros_utils
   )
 
+  add_executable(turtle_odom_test test/turtle_odom_test.cpp)
+  target_link_libraries(turtle_odom_test
+    catch_ros2::catch_ros2_with_node_main)
+  ament_target_dependencies(turtle_odom_test
+    rclcpp
+    std_srvs
+    geometry_msgs
+    sensor_msgs
+    nuturtlebot_msgs
+    tf2_ros
+    tf2
+    leo_ros_utils
+  )
+  target_link_libraries(turtle_odom_test turtlelib::turtlelib
+  ${cpp_typesupport_target})
+
+
   install(TARGETS
     turtle_control_test
+    turtle_odom_test
     DESTINATION lib/${PROJECT_NAME}
   )
 
@@ -120,6 +137,7 @@ if(BUILD_TESTING)
   # This is the launch file that will be used to run the integration test
   install(FILES
     test/turtle_control_test.launch.xml # example in XML
+    test/turtle_odom_test.launch.xml # example in XML
     DESTINATION share/${PROJECT_NAME}
   )
 
@@ -129,6 +147,10 @@ if(BUILD_TESTING)
   catch_ros2_add_integration_test(ExampleIntegration_TestXML
     LAUNCH_FILE turtle_control_test.launch.xml # example in XML
   )
+  # #################
+  # # AMENT tests  ##
+  # #################
+  
 
   find_package(ament_lint_auto REQUIRED)
 
