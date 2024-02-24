@@ -110,4 +110,9 @@ void DiffDrive::SetBodyConfig(const Transform2D &new_tf) {
 
 WheelConfig DiffDrive::GetWheelConfig() { return current_wheel_config_; }
 
+void DiffDrive::SetWheelConfig(WheelConfig new_wheel_cfg){
+  current_wheel_config_ = new_wheel_cfg;
+}
+
+
 } // namespace turtlelib

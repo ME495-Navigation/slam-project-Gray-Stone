@@ -178,6 +178,15 @@ private:
         static_cast<double>(latest_wheel_cmd.right_velocity)};
     turtlelib::WheelVelocity wheel_cmd_vel = raw_cmd_vel * motor_cmd_per_rad_sec * period_sec;
 
+    // This is a special catch showing we have jumped more then pi/2 on
+    // wheel in one iteration, which should not happen! (but let's just let
+    // error play out)
+    if (std::abs(wheel_cmd_vel.left) > turtlelib::PI ||
+        std::abs(wheel_cmd_vel.right) > turtlelib::PI) {
+      RCLCPP_WARN_STREAM(get_logger(),
+                         "This steps's wheel increment is more then PI! "
+                             << wheel_cmd_vel);
+    }
 
     debug_ss << "wheel_cmd " << raw_cmd_vel << "\n";
     debug_ss << "wheel_vel " << wheel_cmd_vel << "\n";
@@ -192,11 +201,22 @@ private:
     debug_ss << "wheel_vel with noise" << wheel_cmd_vel << "\n";
 
     red_bot.UpdateBodyConfigWithVel(wheel_cmd_vel);
+    debug_ss << "new bot body " << red_bot.GetBodyConfig() << "\n";
 
     auto new_wheel_config = red_bot.GetWheelConfig();
     debug_ss << "new wheel_config " << new_wheel_config << "\n";
 
-    debug_ss << "new bot body " << red_bot.GetBodyConfig() << "\n";
+    // The internal tracking of our simulated robot doesn't have wheel slip. 
+    // Wheel slip only show up as a encoder reading goes off, not robot itself goes off.
+
+    new_wheel_config.left += wheel_uniform_distribution(rand_eng);
+    new_wheel_config.right += wheel_uniform_distribution(rand_eng);
+
+    // Since we let diff bot to track our wheel config, it needs to know about
+    // this slip-age update as well. Or next cycle it will ignore this.
+    red_bot.SetWheelConfig(new_wheel_config);
+
+    debug_ss<< "new wheel_config with noise" << new_wheel_config << "\n" ; 
 
     nuturtlebot_msgs::msg::SensorData red_sensor_msg;
     red_sensor_msg.left_encoder = encoder_ticks_per_rad * new_wheel_config.left;
@@ -214,21 +234,6 @@ private:
     auto tf = Gen2DTransform(red_bot.GetBodyConfig(), kWorldFrame,
                              "red/base_footprint");
     tf_broadcaster_->sendTransform(tf);
-
-
-    // This is a debug message showing we have jumped more then pi/2 on wheel in one iteration.
-    if (std::abs(new_wheel_config.left - old_wheel_config.left) >
-            turtlelib::PI ||
-        std::abs(new_wheel_config.right - old_wheel_config.right) >
-            turtlelib::PI) {
-      turtlelib::WheelConfig bad_delta{
-          new_wheel_config.left - old_wheel_config.left,
-          new_wheel_config.right - old_wheel_config.right};
-      RCLCPP_WARN_STREAM(get_logger(),
-                         "This steps's wheel increment is more then PI! "
-                             << bad_delta);
-    }
-    old_wheel_config = new_wheel_config;
 
   }
 
@@ -404,7 +409,6 @@ private:
   std::uniform_real_distribution<double> wheel_uniform_distribution;
 
   std::atomic<uint64_t> time_step_ = 0;
-  turtlelib::WheelConfig old_wheel_config;
   nuturtlebot_msgs::msg::WheelCommands latest_wheel_cmd;
 
 

@@ -44,6 +44,9 @@
         <node pkg="nusim" exec="nusim" output="screen">
             <param from="$(find-pkg-share nusim)/config/basic_world.yaml" />
             <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
+            <param name="input_noise"  value="0.0" />
+            <param name="slip_fraction"  value="0.0" />
+
             <remap from="red/sensor_data" to="sensor_data"/>
             <remap from="red/wheel_cmd" to="wheel_cmd"/>
         </node>

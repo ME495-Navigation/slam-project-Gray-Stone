@@ -115,6 +115,10 @@ public:
   //! @return Current wheel config
   WheelConfig GetWheelConfig();
 
+  //! @brief Set the wheel config directly (teleport/apply wheel slip)
+  //! @param new_wheel_cfg
+  void SetWheelConfig(WheelConfig new_wheel_cfg);
+
 private:
   // These parameters are required in constructor
   double wheel_body_track_; // half distance between two wheels
