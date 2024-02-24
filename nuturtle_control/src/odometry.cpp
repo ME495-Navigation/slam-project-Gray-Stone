@@ -48,10 +48,13 @@
 #include <rclcpp/service.hpp>
 #include <rclcpp/subscription.hpp>
 #include <rclcpp/time.hpp>
+#include <sensor_msgs/msg/detail/joint_state__traits.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <sstream>
 #include <string>
 #include <tf2_ros/transform_broadcaster.h>
 #include <turtlelib/diff_drive.hpp>
+#include <turtlelib/geometry2d.hpp>
 #include <turtlelib/se2d.hpp>
 
 #include <leo_ros_utils/math_helper.hpp>
@@ -76,6 +79,9 @@ public:
                                      "track width between wheel")),
         diff_bot(track_width, wheel_radius), tf_broadcaster(*this) {
 
+    // Uncomment this to turn on debug level and enable debug statements
+    // rcutils_logging_set_logger_level(get_logger().get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
+
     js_linstener = create_subscription<sensor_msgs::msg::JointState>(
         "joint_states", 10,
         std::bind(&Odometry::JointStateCb, this, std::placeholders::_1));
@@ -89,6 +95,9 @@ public:
   }
 
   void JointStateCb(const sensor_msgs::msg::JointState &msg) {
+    std::stringstream debug_ss ;
+    debug_ss << "\n===>\n";
+
 
     turtlelib::WheelConfig new_config;
     for (size_t i = 0; i < msg.name.size(); ++i) {
@@ -99,12 +108,18 @@ public:
       }
     }
 
+      // debug_ss << "JS value: \n" << sensor_msgs::msg::to_yaml(msg) << "\n";
+      debug_ss << "new config from sensor " << new_config << "\n";
+
     diff_bot.UpdateRobotConfig(new_config);
 
     turtlelib::Transform2D bot_tf = diff_bot.GetBodyConfig();
     double current_time =
         rclcpp::Time{msg.header.stamp.sec, msg.header.stamp.nanosec}.seconds();
     double delta_time = current_time - last_stamped_tf2d.first;
+
+      debug_ss << "Body TF " << bot_tf;
+      RCLCPP_DEBUG_STREAM(get_logger() , debug_ss.str()); 
 
     nav_msgs::msg::Odometry odom_msg;
     odom_msg.header.stamp = msg.header.stamp;

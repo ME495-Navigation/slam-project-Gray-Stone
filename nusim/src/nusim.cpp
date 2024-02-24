@@ -22,7 +22,7 @@
 //   /nusim/reset: std_srvs/srv/Empty
 //   /nusim/teleport: nusim/srv/Teleport
 
-
+#include <nuturtlebot_msgs/msg/detail/sensor_data__traits.hpp>
 #include <rclcpp/parameter_value.hpp>
 #include <rclcpp/subscription.hpp>
 #include <rmw/qos_profiles.h>
@@ -48,6 +48,7 @@
 #include <turtlelib/se2d.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
+#include <random>
 
 #include "nusim/srv/teleport.hpp"
 
@@ -56,6 +57,18 @@
 
 namespace {
 std::string kWorldFrame = "nusim/world";
+
+std::random_device rd{}; 
+std::mt19937 rand_eng{rd()};
+
+//  std::mt19937 & get_random()
+//  {
+//     // This actually becomes lazy init
+//      // we return a reference to the pseudo-random number genrator object. This is always the
+//      // same object every time get_random is called
+//      return mt;
+//  }
+
 }
 
 using leo_ros_utils::GetParam;
@@ -80,8 +93,20 @@ public:
             GetParam<double>(*this, "track_width",
                              "robot center to wheel-track distance"),
             GetParam<double>(*this, "wheel_radius", "wheel radius"),
-            turtlelib::Transform2D{{x0, y0}, theta0}})
+            turtlelib::Transform2D{{x0, y0}, theta0}}),
+
+        input_noise(GetParam<double>(
+            *this, "input_noise",
+            "input noise variance when applying wheel velocity" , 0)),
+        slip_fraction(
+            GetParam<double>(*this, "slip_fraction",
+                             "abs range of wheel slip amount on each cycle." , 0)),
+        input_gauss_distribution(0.0, input_noise),
+        wheel_uniform_distribution(-slip_fraction, slip_fraction)
+
   {
+    // Uncomment this to turn on debug level and enable debug statements
+    // rcutils_logging_set_logger_level(get_logger().get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
 
     // Arena wall stuff
     const double arena_x_length =
@@ -92,7 +117,7 @@ public:
     PublishArenaWalls(arena_x_length, arena_y_length);
 
     // obstacle stuff
-    std::cout<<"Doing array stuff" << std::endl;
+    std::cout << "Doing array stuff" << std::endl;
 
     const std::vector<double> obstacles_x = GetParam<std::vector<double>>(
         *this, "obstacles/x", "list of obstacle's x coord");
@@ -139,19 +164,59 @@ private:
     std_msgs::msg::UInt64 msg;
     msg.data = ++time_step_;
 
+    std::stringstream debug_ss ;
+    debug_ss << "\n===>\n";
+
     // Let's move the red bot
-
-    // Why I get warning saying int to double is narrowing conversion?
-    turtlelib::WheelVelocity vel = {
-        static_cast<double>(latest_wheel_cmd.left_velocity),
-        static_cast<double>(latest_wheel_cmd.right_velocity)};
-
     // Directly using duration constructor does work! (default std::ratio is
     // 1:1) Proof here : https://godbolt.org/z/TxMMqvrKh
     double period_sec = std::chrono::duration<double>(update_period).count();
-    red_bot.UpdateBodyConfigWithVel(vel * motor_cmd_per_rad_sec * period_sec);
+
+    // Why I get warning saying int to double is narrowing conversion?
+    turtlelib::WheelVelocity raw_cmd_vel = {
+        static_cast<double>(latest_wheel_cmd.left_velocity),
+        static_cast<double>(latest_wheel_cmd.right_velocity)};
+    turtlelib::WheelVelocity wheel_cmd_vel = raw_cmd_vel * motor_cmd_per_rad_sec * period_sec;
+
+
+    debug_ss << "wheel_cmd " << raw_cmd_vel << "\n";
+    debug_ss << "wheel_vel " << wheel_cmd_vel << "\n";
+    // inject noise between wheel command, and how much motor actually turned.
+    if (turtlelib::almost_equal(wheel_cmd_vel.left, 0)) {
+      wheel_cmd_vel.left += input_gauss_distribution(rand_eng);
+    }
+    if (turtlelib::almost_equal(wheel_cmd_vel.right , 0)){
+      wheel_cmd_vel.left += input_gauss_distribution(rand_eng);
+    }
+    
+    debug_ss << "wheel_vel with noise" << wheel_cmd_vel << "\n";
+
+    red_bot.UpdateBodyConfigWithVel(wheel_cmd_vel);
 
     auto new_wheel_config = red_bot.GetWheelConfig();
+    debug_ss << "new wheel_config " << new_wheel_config << "\n";
+
+    debug_ss << "new bot body " << red_bot.GetBodyConfig() << "\n";
+
+    nuturtlebot_msgs::msg::SensorData red_sensor_msg;
+    red_sensor_msg.left_encoder = encoder_ticks_per_rad * new_wheel_config.left;
+    red_sensor_msg.right_encoder =
+        encoder_ticks_per_rad * new_wheel_config.right;
+    red_sensor_msg.stamp = get_clock()->now();
+    red_sensor_publisher_->publish(red_sensor_msg);
+
+    time_step_publisher_->publish(msg);
+
+    debug_ss << "encoder sensor value" << nuturtlebot_msgs::msg::to_yaml(red_sensor_msg,true);
+
+    RCLCPP_DEBUG_STREAM(get_logger() , debug_ss.str());
+    // Publish TF for red robot
+    auto tf = Gen2DTransform(red_bot.GetBodyConfig(), kWorldFrame,
+                             "red/base_footprint");
+    tf_broadcaster_->sendTransform(tf);
+
+
+    // This is a debug message showing we have jumped more then pi/2 on wheel in one iteration.
     if (std::abs(new_wheel_config.left - old_wheel_config.left) >
             turtlelib::PI ||
         std::abs(new_wheel_config.right - old_wheel_config.right) >
@@ -163,21 +228,8 @@ private:
                          "This steps's wheel increment is more then PI! "
                              << bad_delta);
     }
-
-    nuturtlebot_msgs::msg::SensorData red_sensor_msg;
-    red_sensor_msg.left_encoder = encoder_ticks_per_rad * new_wheel_config.left;
-    red_sensor_msg.right_encoder =
-        encoder_ticks_per_rad * new_wheel_config.right;
-    red_sensor_msg.stamp = get_clock()->now();
-    red_sensor_publisher_->publish(red_sensor_msg);
-
     old_wheel_config = new_wheel_config;
-    time_step_publisher_->publish(msg);
 
-    // Publish TF for red robot
-    auto tf = Gen2DTransform(red_bot.GetBodyConfig(), kWorldFrame,
-                             "red/base_footprint");
-    tf_broadcaster_->sendTransform(tf);
   }
 
   //! @brief service callback for reset
@@ -343,10 +395,18 @@ private:
   double encoder_ticks_per_rad;
   turtlelib::DiffDrive red_bot;
 
+  // simulation only param
+  double input_noise;
+  double slip_fraction;
+
   // These are member variable
+  std::normal_distribution<double> input_gauss_distribution;
+  std::uniform_real_distribution<double> wheel_uniform_distribution;
+
   std::atomic<uint64_t> time_step_ = 0;
   turtlelib::WheelConfig old_wheel_config;
   nuturtlebot_msgs::msg::WheelCommands latest_wheel_cmd;
+
 
   // Ros objects
   rclcpp::TimerBase::SharedPtr main_timer_;

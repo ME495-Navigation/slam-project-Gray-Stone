@@ -1,8 +1,29 @@
+//! @file Control turtle bot.
+
+// Param:
+
+// Publishes:
+//  wheel_cmd - nuturtlebot_msgs::msg::WheelCommands wheel command of robot base
+//  on cmd_vel
+//  joint_states - Publish robot's wheel joint state base on received sensor
+//  data (encoder)
+
+// Subscriber
+//  cmd_vel - geometry_msgs::msg::Twist
+//  sensor_data - nuturtlebot_msgs::msg::SensorData
+
+// Workflow -
+//  Every received cmd_vel, generate and publish a wheel velocity command to
+//  wheel_cmd Every received sensor_data, generate and publish a joint_states
+//  from it.
+
 #include <algorithm>
 #include <cstdint>
+#include <geometry_msgs/msg/detail/pose_with_covariance__traits.hpp>
 #include <geometry_msgs/msg/pose_with_covariance.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/twist.hpp>
+#include <nuturtlebot_msgs/msg/detail/sensor_data__traits.hpp>
 #include <nuturtlebot_msgs/msg/sensor_data.hpp>
 #include <nuturtlebot_msgs/msg/wheel_commands.hpp>
 #include <optional>
@@ -11,6 +32,8 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/subscription.hpp>
 #include <rclcpp/time.hpp>
+#include <rcutils/logging.h>
+#include <rcutils/logging_macros.h>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <stdexcept>
 #include <string>
@@ -38,8 +61,13 @@ public:
                              "encoder ticks of wheel per radius")),
         collision_radius(GetParam<double>(*this, "collision_radius",
                                           "collision radius of robot")),
-        diff_bot(track_width, wheel_radius)
-  {
+        diff_bot(track_width, wheel_radius) {
+    // Didn't find good way to do debug in launch file
+    // Uncomment this to turn on debug level and enable debug statements
+    // rcutils_logging_set_logger_level(get_logger().get_name(),
+    // RCUTILS_LOG_SEVERITY_DEBUG);
+
+    
     cmd_vel_listener = create_subscription<geometry_msgs::msg::Twist>(
         "cmd_vel", 10,
         std::bind(&TurtleControl::CmdVelCb, this, std::placeholders::_1));
@@ -69,31 +97,40 @@ private:
   // Callbacks
   void CmdVelCb(const geometry_msgs::msg::Twist &msg) const {
     // map the twist msg into Twist2D
-    auto wheel_calc = diff_bot.CommandFromTwist(turtlelib::Twist2D{msg.angular.z , msg.linear.x,msg.linear.y});
+    auto wheel_calc = diff_bot.CommandFromTwist(
+        turtlelib::Twist2D{msg.angular.z, msg.linear.x, msg.linear.y});
     // wheel_cmd.left
     // msg.angular.z
-    
+
+    RCLCPP_DEBUG_STREAM(get_logger(), "\n===== \ngot_cmd_vel: "
+                                          << geometry_msgs::msg::to_yaml(msg));
     // Publish wheel_cmd to make turtlebot 3 walk
 
+    RCLCPP_DEBUG_STREAM(get_logger(), "Formed wheel vel: " << wheel_calc);
     auto wheel_cmd = nuturtlebot_msgs::msg::WheelCommands();
 
-
     // Need to the speed clipping in double.
-     double motor_cmd_left=  wheel_calc.left/ motor_cmd_per_rad_sec;
-     double motor_cmd_right= wheel_calc.right/ motor_cmd_per_rad_sec;
-    int32_t higher_velocity = std::max(motor_cmd_left,motor_cmd_right);
+    double motor_cmd_left = wheel_calc.left / motor_cmd_per_rad_sec;
+    double motor_cmd_right = wheel_calc.right / motor_cmd_per_rad_sec;
+    int32_t higher_velocity = std::max(motor_cmd_left, motor_cmd_right);
     double scale_factor = 1;
     if (higher_velocity > motor_cmd_max) {
       scale_factor = motor_cmd_max / higher_velocity;
       RCLCPP_WARN_STREAM(
-        get_logger(),
-        "Motor command velocity is maxing out. Clipping back down. "
-          << scale_factor << " times over");
+          get_logger(),
+          "Motor command velocity is maxing out. Clipping back down. "
+              << scale_factor << " times over");
     }
 
     // Now finally put it back into integer.
-    wheel_cmd.left_velocity  = static_cast<int32_t>(motor_cmd_left * scale_factor);
-    wheel_cmd.right_velocity = static_cast<int32_t>(motor_cmd_right * scale_factor);
+    wheel_cmd.left_velocity =
+        static_cast<int32_t>(motor_cmd_left * scale_factor);
+    wheel_cmd.right_velocity =
+        static_cast<int32_t>(motor_cmd_right * scale_factor);
+
+    RCLCPP_DEBUG_STREAM(
+        get_logger(),
+        "Final wheel cmd: " << nuturtlebot_msgs::msg::to_yaml(wheel_cmd));
 
     wheel_cmd_publisher->publish(wheel_cmd);
   }
@@ -124,11 +161,10 @@ private:
     last_js = js;
   }
 
-  double EncoderToRad(int32_t tick){
+  double EncoderToRad(int32_t tick) {
     return static_cast<double>(tick) /
-                     static_cast<double>(encoder_ticks_per_rad);
+           static_cast<double>(encoder_ticks_per_rad);
   }
-
 
   // parameters
   double wheel_radius;
@@ -137,7 +173,6 @@ private:
   double motor_cmd_per_rad_sec;
   int encoder_ticks_per_rad;
   double collision_radius;
-
 
   turtlelib::DiffDrive diff_bot;
 
@@ -151,7 +186,6 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_listener;
   rclcpp::Subscription<nuturtlebot_msgs::msg::SensorData>::SharedPtr
       sensor_data_listener;
-  
 };
 
 int main(int argc, char *argv[]) {

@@ -1,0 +1,41 @@
+<launch>
+
+
+
+<!-- Special rviz2 for sim -->
+    <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share nuturtle_control)/config/simulation_run.rviz"/>
+
+    <!-- ODOM is reading from red, but publishing to blue robot -->
+    <node pkg="nuturtle_control" exec="odometry" output="screen">
+        <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
+        <param name="body_id" value="/blue/base_footprint"/>
+        <!-- <remap from="joint_states" to="red/joint_states"/> -->
+    </node>
+
+    <!-- Control is controlling red robot. -->
+    <node pkg="nuturtle_control" exec="turtle_control" output="screen">
+        <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
+        <!-- <remap from="joint_states" to="red/joint_states"/> -->
+    </node>
+
+    <!-- The NUSIM need to publish and take data under red -->
+    <node pkg="nusim" exec="nusim" output="screen">
+        <param from="$(find-pkg-share nusim)/config/basic_world.yaml" />
+        <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
+        <!-- <remap from="red/sensor_data" to="sensor_data"/> -->
+        <!-- <remap from="red/wheel_cmd" to="wheel_cmd"/> -->
+    </node>
+
+    <!-- To show red turtle bot -->
+    <include file="$(find-pkg-share nuturtle_description)/launch/load_one.launch.py">
+        <arg name="use_rviz" value="False" />
+        <arg name="color" value="red" />
+    </include>
+    <!-- Also show blue -->
+    <include file="$(find-pkg-share nuturtle_description)/launch/load_one.launch.py">
+        <arg name="use_rviz" value="False" />
+        <arg name="color" value="blue"/>
+        <!-- <arg name="use_jsp" value="true"/> -->
+    </include>
+
+</launch>
