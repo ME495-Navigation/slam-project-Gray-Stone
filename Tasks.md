@@ -30,6 +30,7 @@ Task C
 * Task C.7 done
 * Task C.9 done
 * Task C.10 done
+* Task C.11 done
 
 Task D
 * Task D.1 done

@@ -141,6 +141,9 @@ public:
                                                "motor cmd per rad/s (actually the inverse)")),
         encoder_ticks_per_rad(
             GetParam<double>(*this, "encoder_ticks_per_rad", "encoder_ticks_per_rad")),
+            collision_radius(
+            GetParam<double>(*this, "collision_radius", "collision radius of the robot")),
+
         red_bot(turtlelib::DiffDrive{
             GetParam<double>(*this, "track_width", "robot center to wheel-track distance"),
             GetParam<double>(*this, "wheel_radius", "wheel radius"),
@@ -267,7 +270,10 @@ private:
     red_bot.UpdateBodyConfigWithVel(wheel_cmd_vel);
     debug_ss << "new bot body " << red_bot.GetBodyConfig() << "\n";
 
-    // Check for collision with objects.
+    // Do a collision update.
+    if (CollisionUpdate()) {
+      debug_ss << "bot body after collision check" << red_bot.GetBodyConfig() << "\n";
+    }
 
     auto new_wheel_config = red_bot.GetWheelConfig();
     debug_ss << "new wheel_config " << new_wheel_config << "\n";
@@ -383,11 +389,26 @@ private:
     return tf_stamped;
   }
 
-  turtlelib::Transform2D CollisionUpdate(turtlelib::Transform2D current_robot_pos) {
-    //   for (size_t i = 0; i < x_s.size(); ++i) {
-    // // If the center offset is a thing, try to calculate a new xy.
-    // turtlelib::Point2D obs_loc{x_s.at(i), y_s.at(i)}; // P_world_obs
-    //   }
+  //! @brief Update robot's current config by checking for collision.
+  //! If collision happens, Simply push robot off to the side a bit (to a tangent point)
+  bool CollisionUpdate() {
+    bool collision = false;
+    for (const auto &obs : static_obstacles) {
+      // Get current robot to obstacle vector
+      turtlelib::Vector2D v_obs{obs.pose.position.x, obs.pose.position.y};
+      auto v_robot = red_bot.GetBodyConfig().translation();
+
+      auto v_obs_robot = v_obs - v_robot;
+      double overlap_amount = v_obs_robot.magnitude() - (obstacles_r + collision_radius);
+      if (overlap_amount < 0) {
+        collision = true;
+        // There is a collision, we need to push robot out in this direction.
+        auto push_amount = v_obs_robot.normalize() * overlap_amount;
+
+        red_bot.SetBodyConfig({{v_robot += push_amount}, red_bot.GetBodyConfig().rotation()});
+      }
+    }
+    return collision;
   }
 
   //! @brief Publish visualization markers for arena walls
@@ -475,6 +496,7 @@ private:
   const int motor_cmd_max;
   const double motor_cmd_per_rad_sec;
   const double encoder_ticks_per_rad;
+  const double collision_radius;
   turtlelib::DiffDrive red_bot;
 
   double obstacles_r; // Extra copy for quick access
