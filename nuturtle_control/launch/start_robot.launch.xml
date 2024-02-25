@@ -46,7 +46,7 @@
             <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
             <param name="input_noise"  value="0.0" />
             <param name="slip_fraction"  value="0.0" />
-            <param name="max_range"  value="2.0" />
+            <param name="max_range"  value="-1.0" />
             <param name="basic_sensor_variance"  value="0.01" />
 
             <remap from="red/sensor_data" to="sensor_data"/>

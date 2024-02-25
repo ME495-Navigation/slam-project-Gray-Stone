@@ -20,8 +20,9 @@
 //    obstacles/y: vector<double> - List of obstical's y coordinates
 //    obstacles/r: double - obstacle's radius, all obstacle share this radius
 // Noise in robot's motion
-//    input_noise: double - motor cmd noise, applied to how robot move (and tracked)
-//    slip_fraction: double - wheel slippage, affect the encoder reading to be slightly off
+//    input_noise: double - motor cmd noise, applied to how robot move (and
+//    tracked) slip_fraction: double - wheel slippage, affect the encoder
+//    reading to be slightly off
 // Fake sensor param
 //    max_range: double - max range of fake sensor noise.
 //    basic_sensor_variance: double - the fake sensor variance.
@@ -41,6 +42,7 @@
 //   /nusim/reset: std_srvs/srv/Empty
 //   /nusim/teleport: nusim/srv/Teleport
 
+#include <cstddef>
 #include <nuturtlebot_msgs/msg/detail/sensor_data__traits.hpp>
 #include <rclcpp/parameter_value.hpp>
 #include <rclcpp/subscription.hpp>
@@ -66,6 +68,7 @@
 #include <turtlelib/diff_drive.hpp>
 #include <turtlelib/geometry2d.hpp>
 #include <turtlelib/se2d.hpp>
+#include <vector>
 #include <visualization_msgs/msg/detail/marker_array__struct.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
@@ -89,6 +92,30 @@ auto get_transient_local_qos() {
   return transient_local_qos;
 }
 auto transient_local_qos = get_transient_local_qos();
+
+// markers generated from here missing: header, id, action,
+std::vector<visualization_msgs::msg::Marker> GenObstacles(std::vector<double> x_s,
+                                                          std::vector<double> y_s, double radius) {
+  std::vector<visualization_msgs::msg::Marker> out;
+
+  for (size_t i = 0; i < x_s.size(); ++i) {
+
+    visualization_msgs::msg::Marker obstacle_marker;
+    obstacle_marker.type = obstacle_marker.CYLINDER;
+    obstacle_marker.scale.x = radius * 2;
+    obstacle_marker.scale.y = radius * 2;
+    obstacle_marker.scale.z = 0.25;
+    obstacle_marker.pose.position.x = x_s.at(i);
+    obstacle_marker.pose.position.y = y_s.at(i);
+    obstacle_marker.pose.position.z = 0.25 / 2;
+    obstacle_marker.color.r = 1.0;
+    obstacle_marker.color.a = 0.8;
+
+    // If the center offset is a thing, try to calculate a new xy.
+    out.push_back(obstacle_marker); // P_world_obs
+  }
+  return out;
+}
 
 const std::string kWorldFrame = "nusim/world";
 const std::string kSimRobotBaseFrameID = "red/base_footprint";
@@ -118,12 +145,23 @@ public:
             GetParam<double>(*this, "track_width", "robot center to wheel-track distance"),
             GetParam<double>(*this, "wheel_radius", "wheel radius"),
             turtlelib::Transform2D{{x0, y0}, theta0}}),
-        obstacles_x(
-            GetParam<std::vector<double>>(*this, "obstacles/x", "list of obstacle's x coord")),
-        obstacles_y(
-            GetParam<std::vector<double>>(*this, "obstacles/y", "list of obstacle's y coord")),
         obstacles_r(GetParam<double>(*this, "obstacles/r", "obstacle radius")),
 
+        // This is quite a crazy hack. Using trinary statement and lambda to do it inside initializer
+        // So we can do const on this object.
+        static_obstacles(
+            (GetParam<std::vector<double>>(*this, "obstacles/x", "list of obstacle's x coord")
+                 .size() ==
+             GetParam<std::vector<double>>(*this, "obstacles/y", "list of obstacle's y coord")
+                 .size())
+                ? GenObstacles(get_parameter("obstacles/x").get_value<std::vector<double>>(),
+                               get_parameter("obstacles/y").get_value<std::vector<double>>(),
+                               get_parameter("obstacles/r").get_value<double>())
+                : [&](){
+                  RCLCPP_ERROR(get_logger(), "Mismatch obstacle x y numbers");
+                  throw;
+                  return std::vector<visualization_msgs::msg::Marker>{};
+                  }()),
         // Simulation only params
         input_noise(GetParam<double>(*this, "input_noise",
                                      "input noise variance when applying wheel velocity", 0)),
@@ -154,14 +192,7 @@ public:
 
     PublishArenaWalls(arena_x_length, arena_y_length);
 
-    // obstacle stuff
-    std::cout << "Doing array stuff" << std::endl;
-
-    if (obstacles_x.size() != obstacles_y.size()) {
-      RCLCPP_ERROR(get_logger(), "Mismatch obstacle x y numbers");
-      exit(1);
-    }
-    PublishStaticObstacles(obstacles_x, obstacles_y, obstacles_r);
+    PublishStaticObstacles(static_obstacles);
 
     // Setup pub/sub and srv/client
     time_step_publisher_ = create_publisher<std_msgs::msg::UInt64>("~/timestep", 10);
@@ -236,21 +267,19 @@ private:
     red_bot.UpdateBodyConfigWithVel(wheel_cmd_vel);
     debug_ss << "new bot body " << red_bot.GetBodyConfig() << "\n";
 
+    // Check for collision with objects.
+
     auto new_wheel_config = red_bot.GetWheelConfig();
     debug_ss << "new wheel_config " << new_wheel_config << "\n";
-
     // The internal tracking of our simulated robot doesn't have wheel slip.
     // Wheel slip only show up as a encoder reading goes off, not robot itself
     // goes off.
-
     new_wheel_config.left += wheel_uniform_distribution(rand_eng);
     new_wheel_config.right += wheel_uniform_distribution(rand_eng);
-
+    debug_ss << "new wheel_config with noise" << new_wheel_config << "\n";
     // Since we let diff bot to track our wheel config, it needs to know about
     // this slip-age update as well. Or next cycle it will ignore this.
     red_bot.SetWheelConfig(new_wheel_config);
-
-    debug_ss << "new wheel_config with noise" << new_wheel_config << "\n";
 
     nuturtlebot_msgs::msg::SensorData red_sensor_msg;
     red_sensor_msg.left_encoder = encoder_ticks_per_rad * new_wheel_config.left;
@@ -269,11 +298,33 @@ private:
   }
 
   void fake_sensor_callback() {
+    visualization_msgs::msg::MarkerArray msg;
+    size_t i = 0;
+    for (const auto &obs : static_obstacles) {
+      auto obstacle_marker = obs;
+      obstacle_marker.header.frame_id = kSimRobotBaseFrameID;
+      obstacle_marker.header.stamp = get_clock()->now();
+      obstacle_marker.id = kFakeSenorStartingID + i;
 
-    auto sensor_markers = GenerateObstacleMarkerArray(
-        obstacles_x, obstacles_y, obstacles_r, kSimRobotBaseFrameID, kFakeSenorStartingID,
-        max_range, red_bot.GetBodyConfig(), basic_sensor_gauss_distribution, 0.6);
-    fake_sensor_publisher_->publish(sensor_markers);
+      auto new_loc = red_bot.GetBodyConfig().inv()(
+          {turtlelib::Point2D{obs.pose.position.x, obs.pose.position.y}}); // P_center_obs
+      double range = turtlelib::Vector2D{new_loc.x, new_loc.y}.magnitude();
+      if (range > max_range && max_range >= 0.0) {
+        // Because of this, it's easier to merge logic for both usecase, instead
+        // of doing these math outside and have this function simple.
+        obstacle_marker.action = obstacle_marker.DELETE;
+      } else {
+        obstacle_marker.action = obstacle_marker.MODIFY;
+      }
+
+      // Sensor noise after detection
+      obstacle_marker.pose.position.x = new_loc.x + basic_sensor_gauss_distribution(rand_eng);
+      obstacle_marker.pose.position.y = new_loc.y + basic_sensor_gauss_distribution(rand_eng);
+      obstacle_marker.scale.z = 0.6;
+      msg.markers.push_back(obstacle_marker);
+    }
+
+    fake_sensor_publisher_->publish(msg);
   }
 
   //! @brief service callback for reset
@@ -332,6 +383,13 @@ private:
     return tf_stamped;
   }
 
+  turtlelib::Transform2D CollisionUpdate(turtlelib::Transform2D current_robot_pos) {
+    //   for (size_t i = 0; i < x_s.size(); ++i) {
+    // // If the center offset is a thing, try to calculate a new xy.
+    // turtlelib::Point2D obs_loc{x_s.at(i), y_s.at(i)}; // P_world_obs
+    //   }
+  }
+
   //! @brief Publish visualization markers for arena walls
   //! @param x_length Wall length in x
   //! @param y_length Wall length in y
@@ -381,65 +439,24 @@ private:
   }
 
   //! @brief Publish vitilization markers for obstacles
-  //! @param x_s list of x for each obstacle
-  //! @param y_s list of y for each obstacle
+  //! @param obstacles list of obstacle positions
   //! @param rad radius for all obstacle
-  void PublishStaticObstacles(std::vector<double> x_s, std::vector<double> y_s, double rad) {
+  void PublishStaticObstacles(std::vector<visualization_msgs::msg::Marker> obstacles) {
     static_obstacle_publisher_ =
         create_publisher<visualization_msgs::msg::MarkerArray>("~/obstacles", transient_local_qos);
-    static_obstacle_publisher_->publish(
-        GenerateObstacleMarkerArray(x_s, y_s, rad, kWorldFrame, kStaticObstacleStartingID));
-  }
-
-  visualization_msgs::msg::MarkerArray GenerateObstacleMarkerArray(
-      std::vector<double> x_s, std::vector<double> y_s, double rad, std::string parent_frame,
-      int32_t starting_id, std::optional<double> max_range_opt = std::nullopt,
-      std::optional<turtlelib::Transform2D> center_transform = std::nullopt,
-      std::optional<std::normal_distribution<double>> loc_variance_opt = std::nullopt,
-      double height = 0.25) {
 
     visualization_msgs::msg::MarkerArray msg;
 
-    for (size_t i = 0; i < x_s.size(); ++i) {
-
-      // If the center offset is a thing, try to calculate a new xy.
-      turtlelib::Point2D obs_loc{x_s.at(i), y_s.at(i)}; // P_world_obs
-      if (center_transform) {
-        // T_world_robot needs to be flipped
-        obs_loc = (*center_transform).inv()(obs_loc); // P_center_obs
-      }
-
-      visualization_msgs::msg::Marker obstacle_marker;
-      obstacle_marker.header.frame_id = parent_frame;
-      obstacle_marker.header.stamp = get_clock()->now();
-      obstacle_marker.type = obstacle_marker.CYLINDER;
-      obstacle_marker.id = starting_id + i;
-
-      // Only enforce this when its set.
-      if (max_range_opt) {
-        double range = turtlelib::Vector2D{obs_loc.x, obs_loc.y}.magnitude();
-        if (range > *max_range_opt && *max_range_opt >= 0.0) {
-          obstacle_marker.action = obstacle_marker.DELETE;
-        }
-      }
-
-      // Sensor noise after detection
-      if (loc_variance_opt) {
-        obs_loc.x += (*loc_variance_opt)(rand_eng);
-        obs_loc.y += (*loc_variance_opt)(rand_eng);
-      }
-      obstacle_marker.scale.x = rad * 2;
-      obstacle_marker.scale.y = rad * 2;
-      obstacle_marker.scale.z = height;
-      obstacle_marker.pose.position.x = obs_loc.x;
-      obstacle_marker.pose.position.y = obs_loc.y;
-      obstacle_marker.pose.position.z = height / 2;
-
-      obstacle_marker.color.r = 1.0;
-      obstacle_marker.color.a = 0.8;
-      msg.markers.push_back(obstacle_marker);
+    size_t i = 0;
+    for (const auto &obs : obstacles) {
+      auto copy = obs;
+      copy.header.frame_id = kWorldFrame;
+      copy.header.stamp = get_clock()->now();
+      copy.id = kStaticObstacleStartingID + (i++);
+      copy.action = copy.ADD;
+      msg.markers.push_back(copy);
     }
-    return msg;
+    static_obstacle_publisher_->publish(msg);
   }
 
   // Private Members
@@ -460,11 +477,11 @@ private:
   const double encoder_ticks_per_rad;
   turtlelib::DiffDrive red_bot;
 
-  // The order of these array also defined their ID. so it matters they don't
-  // change
-  const std::vector<double> obstacles_x;
-  const std::vector<double> obstacles_y;
-  const double obstacles_r;
+  double obstacles_r; // Extra copy for quick access
+  // The order of the array also defined their ID. so it matters they don't
+  // change Obstacle constructed using input x_s and y_s Due to check needed on
+  // x_s and y_s, not const
+  const std::vector<visualization_msgs::msg::Marker> static_obstacles;
 
   // simulation only param
   const double input_noise;
