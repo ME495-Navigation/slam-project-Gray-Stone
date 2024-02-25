@@ -310,7 +310,7 @@ private:
       auto obstacle_marker = obs;
       obstacle_marker.header.frame_id = kSimRobotBaseFrameID;
       obstacle_marker.header.stamp = get_clock()->now();
-      obstacle_marker.id = kFakeSenorStartingID + i;
+      obstacle_marker.id = kFakeSenorStartingID + (i++);
 
       auto new_loc = red_bot.GetBodyConfig().inv()(
           {turtlelib::Point2D{obs.pose.position.x, obs.pose.position.y}}); // P_center_obs
