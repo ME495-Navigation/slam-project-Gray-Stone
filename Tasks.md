@@ -27,6 +27,9 @@ Task C
 * Task C.4 done
 * Task C.5 done
 * Task C.6 done
+* Task C.7 done
+* Task C.9 done
+* Task C.10 done
 
 Task D
 * Task D.1 done

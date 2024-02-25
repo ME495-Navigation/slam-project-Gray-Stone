@@ -46,6 +46,8 @@
             <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
             <param name="input_noise"  value="0.0" />
             <param name="slip_fraction"  value="0.0" />
+            <param name="max_range"  value="2.0" />
+            <param name="basic_sensor_variance"  value="0.01" />
 
             <remap from="red/sensor_data" to="sensor_data"/>
             <remap from="red/wheel_cmd" to="wheel_cmd"/>
@@ -53,16 +55,16 @@
 
         <!-- To show red turtle bot -->
         <include file="$(find-pkg-share nuturtle_description)/launch/load_one.launch.py">
-            <arg name="use_rviz" value="False" />
+            <arg name="use_rviz" value="false" />
             <arg name="color" value="red" />
-            <arg name="use_jsp" value="False" />
+            <arg name="use_jsp" value="false" />
         </include>
         <!-- Also show blue -->
         <include file="$(find-pkg-share nuturtle_description)/launch/load_one.launch.py">
-            <arg name="use_rviz" value="False" />
+            <arg name="use_rviz" value="false" />
             <arg name="color" value="blue"/>
             <!-- Blue should be publishing a fake JS. We actually should sync blue's JS to red, but since remap is not a thing for import. just skip it -->
-            <!-- <arg name="use_jsp" value="False" /> -->
+            <arg name="use_jsp" value="true" />
         </include>
 
     </group>

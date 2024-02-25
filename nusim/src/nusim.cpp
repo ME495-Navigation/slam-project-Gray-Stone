@@ -37,6 +37,7 @@
 #include <nuturtlebot_msgs/msg/sensor_data.hpp>
 #include <nuturtlebot_msgs/msg/wheel_commands.hpp>
 #include <optional>
+#include <random>
 #include <rclcpp/qos.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
@@ -46,9 +47,9 @@
 #include <turtlelib/diff_drive.hpp>
 #include <turtlelib/geometry2d.hpp>
 #include <turtlelib/se2d.hpp>
+#include <visualization_msgs/msg/detail/marker_array__struct.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
-#include <random>
 
 #include "nusim/srv/teleport.hpp"
 
@@ -56,20 +57,25 @@
 #include <geometry_msgs/msg/pose_with_covariance.hpp>
 
 namespace {
-std::string kWorldFrame = "nusim/world";
 
-std::random_device rd{}; 
+std::random_device rd{};
 std::mt19937 rand_eng{rd()};
+auto get_transient_local_qos() {
+  auto profile = rmw_qos_profile_default;
+  profile.durability =
+      rmw_qos_durability_policy_e::RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL;
+  // rclcpp::QoSInitialization(rclcpp::KeepAll(),profile)
+  rclcpp::QoS transient_local_qos(rclcpp::KeepLast(2), profile);
+  transient_local_qos.durability(rclcpp::DurabilityPolicy::TransientLocal);
 
-//  std::mt19937 & get_random()
-//  {
-//     // This actually becomes lazy init
-//      // we return a reference to the pseudo-random number genrator object. This is always the
-//      // same object every time get_random is called
-//      return mt;
-//  }
-
+  return transient_local_qos;
 }
+auto transient_local_qos = get_transient_local_qos();
+
+const std::string kWorldFrame = "nusim/world";
+const std::string kSimRobotBaseFrameID = "red/base_footprint";
+
+} // namespace
 
 using leo_ros_utils::GetParam;
 
@@ -78,6 +84,8 @@ class NuSim : public rclcpp::Node {
 public:
   NuSim()
       : Node("nusim"),
+
+        // Ros related params
         update_period(std::chrono::milliseconds(
             1000 / GetParam<int>(*this, "rate", "The rate of simulator", 200))),
         x0(GetParam<double>(*this, "x0", "inital robot x location")),
@@ -94,19 +102,36 @@ public:
                              "robot center to wheel-track distance"),
             GetParam<double>(*this, "wheel_radius", "wheel radius"),
             turtlelib::Transform2D{{x0, y0}, theta0}}),
+        obstacles_x(GetParam<std::vector<double>>(
+            *this, "obstacles/x", "list of obstacle's x coord")),
+        obstacles_y(GetParam<std::vector<double>>(
+            *this, "obstacles/y", "list of obstacle's y coord")),
+        obstacles_r(GetParam<double>(*this, "obstacles/r", "obstacle radius")),
 
+        // Simulation only params
         input_noise(GetParam<double>(
             *this, "input_noise",
-            "input noise variance when applying wheel velocity" , 0)),
-        slip_fraction(
-            GetParam<double>(*this, "slip_fraction",
-                             "abs range of wheel slip amount on each cycle." , 0)),
+            "input noise variance when applying wheel velocity", 0)),
+        slip_fraction(GetParam<double>(
+            *this, "slip_fraction",
+            "abs range of wheel slip amount on each cycle.", 0)),
+        max_range(GetParam<double>(*this, "max_range",
+                                   "maxinum range for basic sensor to see a "
+                                   "obsticle. negative will disable max range",
+                                   -1.0)),
+
+        // Member variable, not param
         input_gauss_distribution(0.0, input_noise),
-        wheel_uniform_distribution(-slip_fraction, slip_fraction)
+        wheel_uniform_distribution(-slip_fraction, slip_fraction),
+        basic_sensor_gauss_distribution(
+            0.0,
+            GetParam<double>(*this, "basic_sensor_variance",
+                             "variance of noise in basic sensor's reading.", 0))
 
   {
     // Uncomment this to turn on debug level and enable debug statements
-    // rcutils_logging_set_logger_level(get_logger().get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
+    // rcutils_logging_set_logger_level(get_logger().get_name(),
+    // RCUTILS_LOG_SEVERITY_DEBUG);
 
     // Arena wall stuff
     const double arena_x_length =
@@ -119,23 +144,20 @@ public:
     // obstacle stuff
     std::cout << "Doing array stuff" << std::endl;
 
-    const std::vector<double> obstacles_x = GetParam<std::vector<double>>(
-        *this, "obstacles/x", "list of obstacle's x coord");
-    const std::vector<double> obstacles_y = GetParam<std::vector<double>>(
-        *this, "obstacles/y", "list of obstacle's y coord");
-    const double obstacles_r =
-        GetParam<double>(*this, "obstacles/r", "obstacle radius");
     if (obstacles_x.size() != obstacles_y.size()) {
       RCLCPP_ERROR(get_logger(), "Mismatch obstacle x y numbers");
       exit(1);
     }
-    PublishObstacles(obstacles_x, obstacles_y, obstacles_r);
+    PublishStaticObstacles(obstacles_x, obstacles_y, obstacles_r);
 
     // Setup pub/sub and srv/client
     time_step_publisher_ =
         create_publisher<std_msgs::msg::UInt64>("~/timestep", 10);
     red_sensor_publisher_ = create_publisher<nuturtlebot_msgs::msg::SensorData>(
         "red/sensor_data", 10);
+    fake_sensor_publisher_ =
+        create_publisher<visualization_msgs::msg::MarkerArray>("/fake_sensor",
+                                                               10);
 
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
@@ -150,6 +172,11 @@ public:
     // Setup timer and set things in motion.
     main_timer_ = this->create_wall_timer(
         update_period, std::bind(&NuSim::main_timer_callback, this));
+
+    // 5HZ update rate
+    fake_sensor_timer_ =
+        this->create_wall_timer(std::chrono::milliseconds{200},
+                                std::bind(&NuSim::fake_sensor_callback, this));
     wheel_cmd_listener_ =
         create_subscription<nuturtlebot_msgs::msg::WheelCommands>(
             "red/wheel_cmd", 10,
@@ -164,7 +191,7 @@ private:
     std_msgs::msg::UInt64 msg;
     msg.data = ++time_step_;
 
-    std::stringstream debug_ss ;
+    std::stringstream debug_ss;
     debug_ss << "\n===>\n";
 
     // Let's move the red bot
@@ -176,7 +203,8 @@ private:
     turtlelib::WheelVelocity raw_cmd_vel = {
         static_cast<double>(latest_wheel_cmd.left_velocity),
         static_cast<double>(latest_wheel_cmd.right_velocity)};
-    turtlelib::WheelVelocity wheel_cmd_vel = raw_cmd_vel * motor_cmd_per_rad_sec * period_sec;
+    turtlelib::WheelVelocity wheel_cmd_vel =
+        raw_cmd_vel * motor_cmd_per_rad_sec * period_sec;
 
     // This is a special catch showing we have jumped more then pi/2 on
     // wheel in one iteration, which should not happen! (but let's just let
@@ -194,10 +222,10 @@ private:
     if (turtlelib::almost_equal(wheel_cmd_vel.left, 0)) {
       wheel_cmd_vel.left += input_gauss_distribution(rand_eng);
     }
-    if (turtlelib::almost_equal(wheel_cmd_vel.right , 0)){
+    if (turtlelib::almost_equal(wheel_cmd_vel.right, 0)) {
       wheel_cmd_vel.left += input_gauss_distribution(rand_eng);
     }
-    
+
     debug_ss << "wheel_vel with noise" << wheel_cmd_vel << "\n";
 
     red_bot.UpdateBodyConfigWithVel(wheel_cmd_vel);
@@ -206,8 +234,9 @@ private:
     auto new_wheel_config = red_bot.GetWheelConfig();
     debug_ss << "new wheel_config " << new_wheel_config << "\n";
 
-    // The internal tracking of our simulated robot doesn't have wheel slip. 
-    // Wheel slip only show up as a encoder reading goes off, not robot itself goes off.
+    // The internal tracking of our simulated robot doesn't have wheel slip.
+    // Wheel slip only show up as a encoder reading goes off, not robot itself
+    // goes off.
 
     new_wheel_config.left += wheel_uniform_distribution(rand_eng);
     new_wheel_config.right += wheel_uniform_distribution(rand_eng);
@@ -216,7 +245,7 @@ private:
     // this slip-age update as well. Or next cycle it will ignore this.
     red_bot.SetWheelConfig(new_wheel_config);
 
-    debug_ss<< "new wheel_config with noise" << new_wheel_config << "\n" ; 
+    debug_ss << "new wheel_config with noise" << new_wheel_config << "\n";
 
     nuturtlebot_msgs::msg::SensorData red_sensor_msg;
     red_sensor_msg.left_encoder = encoder_ticks_per_rad * new_wheel_config.left;
@@ -227,14 +256,23 @@ private:
 
     time_step_publisher_->publish(msg);
 
-    debug_ss << "encoder sensor value" << nuturtlebot_msgs::msg::to_yaml(red_sensor_msg,true);
+    debug_ss << "encoder sensor value"
+             << nuturtlebot_msgs::msg::to_yaml(red_sensor_msg, true);
 
-    RCLCPP_DEBUG_STREAM(get_logger() , debug_ss.str());
+    RCLCPP_DEBUG_STREAM(get_logger(), debug_ss.str());
     // Publish TF for red robot
     auto tf = Gen2DTransform(red_bot.GetBodyConfig(), kWorldFrame,
-                             "red/base_footprint");
+                             kSimRobotBaseFrameID);
     tf_broadcaster_->sendTransform(tf);
+  }
 
+  void fake_sensor_callback() {
+
+    auto sensor_markers = GenerateObstacleMarkerArray(
+        obstacles_x, obstacles_y, obstacles_r, kSimRobotBaseFrameID,
+        kFakeSenorStartingID, max_range, red_bot.GetBodyConfig(),
+        basic_sensor_gauss_distribution, 0.6);
+    fake_sensor_publisher_->publish(sensor_markers);
   }
 
   //! @brief service callback for reset
@@ -299,14 +337,9 @@ private:
   //! @param x_length Wall length in x
   //! @param y_length Wall length in y
   void PublishArenaWalls(double x_length, double y_length) {
-    auto profile = rmw_qos_profile_default;
-    profile.durability =
-        rmw_qos_durability_policy_e::RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL;
-    // rclcpp::QoSInitialization(rclcpp::KeepAll(),profile)
-    rclcpp::QoS qos(rclcpp::KeepLast(2), profile);
-    qos.durability(rclcpp::DurabilityPolicy::TransientLocal);
     area_wall_publisher_ =
-        create_publisher<visualization_msgs::msg::MarkerArray>("~/walls", qos);
+        create_publisher<visualization_msgs::msg::MarkerArray>(
+            "~/walls", transient_local_qos);
 
     visualization_msgs::msg::MarkerArray msg;
 
@@ -353,72 +386,115 @@ private:
   //! @param x_s list of x for each obstacle
   //! @param y_s list of y for each obstacle
   //! @param rad radius for all obstacle
-  void PublishObstacles(std::vector<double> x_s, std::vector<double> y_s,
-                        double rad) {
-    auto profile = rmw_qos_profile_default;
-    profile.durability =
-        rmw_qos_durability_policy_e::RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL;
-    // rclcpp::QoSInitialization(rclcpp::KeepAll(),profile)
-    rclcpp::QoS qos(rclcpp::KeepLast(2), profile);
-    qos.durability(rclcpp::DurabilityPolicy::TransientLocal);
-    obstacle_publisher_ =
-        create_publisher<visualization_msgs::msg::MarkerArray>("~/obstacles",
-                                                               qos);
+  void PublishStaticObstacles(std::vector<double> x_s, std::vector<double> y_s,
+                              double rad) {
+    static_obstacle_publisher_ =
+        create_publisher<visualization_msgs::msg::MarkerArray>(
+            "~/obstacles", transient_local_qos);
+    static_obstacle_publisher_->publish(GenerateObstacleMarkerArray(
+        x_s, y_s, rad, kWorldFrame, kStaticObstacleStartingID));
+  }
+
+  visualization_msgs::msg::MarkerArray GenerateObstacleMarkerArray(
+      std::vector<double> x_s, std::vector<double> y_s, double rad,
+      std::string parent_frame, int32_t starting_id,
+      std::optional<double> max_range_opt = std::nullopt,
+      std::optional<turtlelib::Transform2D> center_transform = std::nullopt,
+      std::optional<std::normal_distribution<double>> loc_variance_opt =
+          std::nullopt,
+      double height = 0.25) {
 
     visualization_msgs::msg::MarkerArray msg;
 
     for (size_t i = 0; i < x_s.size(); ++i) {
+
+      // If the center offset is a thing, try to calculate a new xy.
+      turtlelib::Point2D obs_loc{x_s.at(i), y_s.at(i)}; // P_world_obs
+      if (center_transform) {
+        // T_world_robot needs to be flipped
+        obs_loc = (*center_transform).inv()(obs_loc); // P_center_obs
+      }
+
       visualization_msgs::msg::Marker obstacle_marker;
-      obstacle_marker.header.frame_id = kWorldFrame;
+      obstacle_marker.header.frame_id = parent_frame;
       obstacle_marker.header.stamp = get_clock()->now();
       obstacle_marker.type = obstacle_marker.CYLINDER;
-      obstacle_marker.id = 10 + i;
+      obstacle_marker.id = starting_id + i;
+
+      // Only enforce this when its set.
+      if (max_range_opt) {
+        double range = turtlelib::Vector2D{obs_loc.x, obs_loc.y}.magnitude();
+        if (range > *max_range_opt && *max_range_opt >= 0.0) {
+          obstacle_marker.action = obstacle_marker.DELETE;
+        }
+      }
+
+      // Sensor noise after detection
+      if (loc_variance_opt) {
+        obs_loc.x += (*loc_variance_opt)(rand_eng);
+        obs_loc.y += (*loc_variance_opt)(rand_eng);
+      }
       obstacle_marker.scale.x = rad * 2;
       obstacle_marker.scale.y = rad * 2;
-      obstacle_marker.scale.z = 0.25;
-      obstacle_marker.pose.position.x = x_s.at(i);
-      obstacle_marker.pose.position.y = y_s.at(i);
-      obstacle_marker.pose.position.z = 0.25 / 2;
+      obstacle_marker.scale.z = height;
+      obstacle_marker.pose.position.x = obs_loc.x;
+      obstacle_marker.pose.position.y = obs_loc.y;
+      obstacle_marker.pose.position.z = height / 2;
 
       obstacle_marker.color.r = 1.0;
-      obstacle_marker.color.a = 1.0;
+      obstacle_marker.color.a = 0.8;
       msg.markers.push_back(obstacle_marker);
     }
-    obstacle_publisher_->publish(msg);
+    return msg;
   }
 
   // Private Members
 
-  // Ros Params
-  std::chrono::nanoseconds update_period; // period for each cycle of update
-  double x0 = 0;                          // Init x location
-  double y0 = 0;                          // Init y location
-  double theta0 = 0;                      // Init theta location
+  // Constants
 
-  int motor_cmd_max;
-  double motor_cmd_per_rad_sec;
-  double encoder_ticks_per_rad;
+  constexpr static int32_t kStaticObstacleStartingID = 10;
+  constexpr static int32_t kFakeSenorStartingID = 150;
+
+  // Ros Params
+  const std::chrono::nanoseconds
+      update_period;       // period for each cycle of update
+  const double x0 = 0;     // Init x location
+  const double y0 = 0;     // Init y location
+  const double theta0 = 0; // Init theta location
+
+  const int motor_cmd_max;
+  const double motor_cmd_per_rad_sec;
+  const double encoder_ticks_per_rad;
   turtlelib::DiffDrive red_bot;
 
-  // simulation only param
-  double input_noise;
-  double slip_fraction;
+  // The order of these array also defined their ID. so it matters they don't
+  // change
+  const std::vector<double> obstacles_x;
+  const std::vector<double> obstacles_y;
+  const double obstacles_r;
 
+  // simulation only param
+  const double input_noise;
+  const double slip_fraction;
+  const double max_range;
   // These are member variable
   std::normal_distribution<double> input_gauss_distribution;
   std::uniform_real_distribution<double> wheel_uniform_distribution;
+  std::normal_distribution<double> basic_sensor_gauss_distribution;
 
   std::atomic<uint64_t> time_step_ = 0;
   nuturtlebot_msgs::msg::WheelCommands latest_wheel_cmd;
 
-
   // Ros objects
   rclcpp::TimerBase::SharedPtr main_timer_;
+  rclcpp::TimerBase::SharedPtr fake_sensor_timer_;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr reset_service_;
   rclcpp::Service<nusim::srv::Teleport>::SharedPtr teleport_service_;
   rclcpp::Publisher<std_msgs::msg::UInt64>::SharedPtr time_step_publisher_;
   rclcpp::Publisher<nuturtlebot_msgs::msg::SensorData>::SharedPtr
       red_sensor_publisher_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
+      fake_sensor_publisher_;
   rclcpp::Subscription<nuturtlebot_msgs::msg::WheelCommands>::SharedPtr
       wheel_cmd_listener_;
 
@@ -427,7 +503,7 @@ private:
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
       area_wall_publisher_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
-      obstacle_publisher_;
+      static_obstacle_publisher_;
 
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 };
