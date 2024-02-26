@@ -79,7 +79,7 @@ Twist2D DiffDrive::TwistFromWheelDelta(WheelConfig wheel_delta,
 
   // Body angle phi is given by caller. By not providing one (phi=0),
   // Body twist is computed.
-  double delta_omega =
+    double delta_omega = // great opportunity for const auto here
       wheel_radius_ * (-1.0 / (2.0 * wheel_body_track_) * wheel_delta.left +
                        1.0 / (2.0 * wheel_body_track_) * wheel_delta.right);
   double delta_x =
@@ -88,7 +88,7 @@ Twist2D DiffDrive::TwistFromWheelDelta(WheelConfig wheel_delta,
   double delta_y =
       wheel_radius_ * (0.5 * std::sin(body_phi) * wheel_delta.left +
                        0.5 * std::sin(body_phi) * wheel_delta.right);
-  return Twist2D{delta_omega, delta_x, delta_y};
+  return Twist2D{delta_omega, delta_x, delta_y}; // No need for Twist2D
 }
 
 WheelVelocity DiffDrive::CommandFromTwist(Twist2D cmd) const {

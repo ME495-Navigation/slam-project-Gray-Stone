@@ -16,7 +16,7 @@
     <!-- CMD input sutff -->
     <node pkg="nuturtle_control" exec="circle" output="screen" if="$(eval ' \'$(var cmd_src)\' == \'circle\' ')" />
 
-    <node pkg="turtlebot3_teleop" exec="teleop_keyboard" output="screen" if="$(eval ' \'$(var cmd_src)\' == \'teleop\' ')" />
+    <node pkg="turtlebot3_teleop" exec="teleop_keyboard" output="screen" if="$(eval ' \'$(var cmd_src)\' == \'teleop\' ')" launch-prefix="xterm -e"/>
 
 
     <!-- Robot stuff -->

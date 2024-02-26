@@ -1,0 +1,7 @@
+There is a compilation warning
+there are test failures
+teleop keyboard does not launch
+There is some minor jittering with the blue robot. This indicates a small bug (perhaps a problem with timestamps on the transforms vs joint states)
+Good work with the utilities, the ros parameter api is somewhat annoying and the GetParam is particularly useful.
+The robots move too fast. It fails the .1m/s for 10 s to traverse 1 meter test.
+Missing comments describing the ROS api of the nodes

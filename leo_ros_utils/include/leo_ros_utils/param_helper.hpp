@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <turtlelib/to_string.hpp>
 namespace leo_ros_utils {
-
+    // These utilities make a lot of sense
 // The Rclcpp parameter is initially DESIGNED TO NOT SUPPORT NON_OPTIONAL
 // ARGUMENT!
 
