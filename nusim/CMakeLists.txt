@@ -15,6 +15,7 @@ find_package(rclcpp REQUIRED)
 find_package(nuturtlebot_msgs REQUIRED)
 find_package(turtlelib REQUIRED)
 find_package(leo_ros_utils REQUIRED)
+find_package(nav_msgs REQUIRED)
 
 find_package(visualization_msgs REQUIRED)
 
@@ -63,6 +64,7 @@ ament_target_dependencies(
   tf2
   tf2_ros
   visualization_msgs
+  nav_msgs
   nuturtlebot_msgs
   leo_ros_utils
   )

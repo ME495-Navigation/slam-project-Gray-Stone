@@ -43,13 +43,13 @@
 //   /nusim/teleport: nusim/srv/Teleport
 
 #include <cstddef>
-#include <nuturtlebot_msgs/msg/detail/sensor_data__traits.hpp>
 #include <rclcpp/parameter_value.hpp>
 #include <rclcpp/subscription.hpp>
 #include <rmw/qos_profiles.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_ros/transform_broadcaster.h>
 
+#include <deque>
 #include <atomic>
 #include <chrono>
 #include <functional>
@@ -69,13 +69,14 @@
 #include <turtlelib/geometry2d.hpp>
 #include <turtlelib/se2d.hpp>
 #include <vector>
-#include <visualization_msgs/msg/detail/marker_array__struct.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
+#include <nav_msgs/msg/path.hpp>
 #include "nusim/srv/teleport.hpp"
 
 #include "leo_ros_utils/param_helper.hpp"
+#include "leo_ros_utils/math_helper.hpp"
 #include <geometry_msgs/msg/pose_with_covariance.hpp>
 
 namespace {
@@ -197,15 +198,19 @@ public:
 
     PublishStaticObstacles(static_obstacles);
 
-    // Setup pub/sub and srv/client
+    // Setup pub/sub 
     time_step_publisher_ = create_publisher<std_msgs::msg::UInt64>("~/timestep", 10);
     red_sensor_publisher_ =
         create_publisher<nuturtlebot_msgs::msg::SensorData>("red/sensor_data", 10);
     fake_sensor_publisher_ =
         create_publisher<visualization_msgs::msg::MarkerArray>("/fake_sensor", 10);
 
+    path_publisher =
+        create_publisher<nav_msgs::msg::Path>("red/path", 10);
+
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
+    // Setup srv/client
     reset_service_ = create_service<std_srvs::srv::Empty>(
         "~/reset",
         std::bind(&NuSim::reset_srv, this, std::placeholders::_1, std::placeholders::_2));
@@ -230,8 +235,9 @@ private:
 
   //! @brief Main timer callback function.
   void main_timer_callback() {
-    std_msgs::msg::UInt64 msg;
-    msg.data = ++time_step_;
+    std_msgs::msg::UInt64 time_step_msg;
+    time_step_msg.data = ++time_step_;
+    time_step_publisher_->publish(time_step_msg);
 
     std::stringstream debug_ss;
     debug_ss << "\n===>\n";
@@ -292,15 +298,28 @@ private:
     red_sensor_msg.right_encoder = encoder_ticks_per_rad * new_wheel_config.right;
     red_sensor_msg.stamp = get_clock()->now();
     red_sensor_publisher_->publish(red_sensor_msg);
-
-    time_step_publisher_->publish(msg);
-
     debug_ss << "encoder sensor value" << nuturtlebot_msgs::msg::to_yaml(red_sensor_msg, true);
 
-    RCLCPP_DEBUG_STREAM(get_logger(), debug_ss.str());
     // Publish TF for red robot
     auto tf = Gen2DTransform(red_bot.GetBodyConfig(), kWorldFrame, kSimRobotBaseFrameID);
     tf_broadcaster_->sendTransform(tf);
+
+    // Publish the robot track path.
+    geometry_msgs::msg::PoseStamped new_pose;
+    new_pose.pose = leo_ros_utils::Convert(red_bot.GetBodyConfig());
+    new_pose.header.frame_id =kWorldFrame;
+    new_pose.header.stamp = get_clock()->now();
+     
+    bot_path_history.push_back(new_pose  );
+    if (bot_path_history.size() >= kRobotPathHistorySize){
+      bot_path_history.pop_front();
+    }
+    nav_msgs::msg::Path path_msg;
+    path_msg.header = new_pose.header;
+    path_msg.poses = std::vector<geometry_msgs::msg::PoseStamped>{bot_path_history.begin(), bot_path_history.end()};
+    path_publisher->publish(path_msg);
+
+    RCLCPP_DEBUG_STREAM(get_logger(), debug_ss.str());
   }
 
   void fake_sensor_callback() {
@@ -326,7 +345,11 @@ private:
       // Sensor noise after detection
       obstacle_marker.pose.position.x = new_loc.x + basic_sensor_gauss_distribution(rand_eng);
       obstacle_marker.pose.position.y = new_loc.y + basic_sensor_gauss_distribution(rand_eng);
-      obstacle_marker.scale.z = 0.6;
+      obstacle_marker.scale.z = 0.4;
+      obstacle_marker.pose.position.z = 0.4/2;
+      obstacle_marker.color.g = 1.0;
+      obstacle_marker.color.a = 0.4;
+
       msg.markers.push_back(obstacle_marker);
     }
 
@@ -486,6 +509,7 @@ private:
 
   constexpr static int32_t kStaticObstacleStartingID = 10;
   constexpr static int32_t kFakeSenorStartingID = 150;
+  constexpr static size_t kRobotPathHistorySize = 400 ; // number of data points
 
   // Ros Params
   const std::chrono::nanoseconds update_period; // period for each cycle of update
@@ -516,15 +540,22 @@ private:
 
   std::atomic<uint64_t> time_step_ = 0;
   nuturtlebot_msgs::msg::WheelCommands latest_wheel_cmd;
+  std::deque<geometry_msgs::msg::PoseStamped> bot_path_history = std::deque<geometry_msgs::msg::PoseStamped>(kRobotPathHistorySize);
+  
 
   // Ros objects
   rclcpp::TimerBase::SharedPtr main_timer_;
   rclcpp::TimerBase::SharedPtr fake_sensor_timer_;
+  
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr reset_service_;
   rclcpp::Service<nusim::srv::Teleport>::SharedPtr teleport_service_;
+  
   rclcpp::Publisher<std_msgs::msg::UInt64>::SharedPtr time_step_publisher_;
   rclcpp::Publisher<nuturtlebot_msgs::msg::SensorData>::SharedPtr red_sensor_publisher_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr fake_sensor_publisher_;
+  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_publisher;
+  std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+
   rclcpp::Subscription<nuturtlebot_msgs::msg::WheelCommands>::SharedPtr wheel_cmd_listener_;
 
   // The publisher need to be kept so the transient local message can still be
@@ -532,7 +563,6 @@ private:
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr area_wall_publisher_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr static_obstacle_publisher_;
 
-  std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 };
 
 //! @brief Main entry point for the nusim node
