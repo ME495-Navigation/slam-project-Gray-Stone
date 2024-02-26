@@ -34,8 +34,10 @@
 #include <geometry_msgs/msg/twist.hpp>
 #include <geometry_msgs/msg/twist_with_covariance.hpp>
 
+#include <deque>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
+#include <nav_msgs/msg/path.hpp>
 #include <nuturtle_control/srv/init_pose.hpp>
 #include <nuturtlebot_msgs/msg/sensor_data.hpp>
 #include <nuturtlebot_msgs/msg/wheel_commands.hpp>
@@ -65,39 +67,33 @@ using leo_ros_utils::GetParam;
 class Odometry : public rclcpp::Node {
 public:
   Odometry()
-      : Node("odometry"), body_id(GetParam<std::string>(
-                              *this, "body_id", "name of the body frame")),
-        odom_id(GetParam<std::string>(*this, "odom_id",
-                                      "name of the odometry frame", "odom")),
-        wheel_left(GetParam<std::string>(*this, "wheel_left",
-                                         "name of left wheel joint")),
-        wheel_right(GetParam<std::string>(*this, "wheel_right",
-                                          "name of right wheel joint")),
-        wheel_radius(
-            GetParam<double>(*this, "wheel_radius", "Radius of wheel")),
-        track_width(GetParam<double>(*this, "track_width",
-                                     "track width between wheel")),
+      : Node("odometry"),
+        body_id(GetParam<std::string>(*this, "body_id", "name of the body frame")),
+        odom_id(GetParam<std::string>(*this, "odom_id", "name of the odometry frame", "odom")),
+        wheel_left(GetParam<std::string>(*this, "wheel_left", "name of left wheel joint")),
+        wheel_right(GetParam<std::string>(*this, "wheel_right", "name of right wheel joint")),
+        wheel_radius(GetParam<double>(*this, "wheel_radius", "Radius of wheel")),
+        track_width(GetParam<double>(*this, "track_width", "track width between wheel")),
         diff_bot(track_width, wheel_radius), tf_broadcaster(*this) {
 
     // Uncomment this to turn on debug level and enable debug statements
     // rcutils_logging_set_logger_level(get_logger().get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
 
     js_linstener = create_subscription<sensor_msgs::msg::JointState>(
-        "joint_states", 10,
-        std::bind(&Odometry::JointStateCb, this, std::placeholders::_1));
+        "joint_states", 10, std::bind(&Odometry::JointStateCb, this, std::placeholders::_1));
 
     odom_publisher = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
 
+    path_publisher_ = create_publisher<nav_msgs::msg::Path>("blue/path", 10);
+
     init_pose_srv = create_service<nuturtle_control::srv::InitPose>(
         "initial_pose",
-        std::bind(&Odometry::init_pose_cb, this, std::placeholders::_1,
-                  std::placeholders::_2));
+        std::bind(&Odometry::init_pose_cb, this, std::placeholders::_1, std::placeholders::_2));
   }
 
   void JointStateCb(const sensor_msgs::msg::JointState &msg) {
-    std::stringstream debug_ss ;
+    std::stringstream debug_ss;
     debug_ss << "\n===>\n";
-
 
     turtlelib::WheelConfig new_config;
     for (size_t i = 0; i < msg.name.size(); ++i) {
@@ -108,37 +104,35 @@ public:
       }
     }
 
-      // debug_ss << "JS value: \n" << sensor_msgs::msg::to_yaml(msg) << "\n";
-      debug_ss << "new config from sensor " << new_config << "\n";
+    // debug_ss << "JS value: \n" << sensor_msgs::msg::to_yaml(msg) << "\n";
+    debug_ss << "new config from sensor " << new_config << "\n";
 
     diff_bot.UpdateRobotConfig(new_config);
 
     turtlelib::Transform2D bot_tf = diff_bot.GetBodyConfig();
-    double current_time =
-        rclcpp::Time{msg.header.stamp.sec, msg.header.stamp.nanosec}.seconds();
+    double current_time = rclcpp::Time{msg.header.stamp.sec, msg.header.stamp.nanosec}.seconds();
     double delta_time = current_time - last_stamped_tf2d.first;
 
-      debug_ss << "Body TF " << bot_tf;
-      RCLCPP_DEBUG_STREAM(get_logger() , debug_ss.str()); 
+    debug_ss << "Body TF " << bot_tf;
+    RCLCPP_DEBUG_STREAM(get_logger(), debug_ss.str());
 
+    // Publish a odom message.
     nav_msgs::msg::Odometry odom_msg;
     odom_msg.header.stamp = msg.header.stamp;
     odom_msg.header.frame_id = odom_id;
     odom_msg.child_frame_id = body_id;
 
     odom_msg.pose.pose = leo_ros_utils::Convert(bot_tf);
-
     odom_msg.twist.twist.linear.x =
-        (bot_tf.translation().x - last_stamped_tf2d.second.translation().x) /
-        delta_time;
+        (bot_tf.translation().x - last_stamped_tf2d.second.translation().x) / delta_time;
     odom_msg.twist.twist.linear.y =
-        (bot_tf.translation().y - last_stamped_tf2d.second.translation().y) /
-        delta_time;
+        (bot_tf.translation().y - last_stamped_tf2d.second.translation().y) / delta_time;
     odom_msg.twist.twist.angular.z =
         (bot_tf.rotation() - last_stamped_tf2d.second.rotation()) / delta_time;
 
     odom_publisher->publish(odom_msg);
 
+    // Publish the tf stamped.
     geometry_msgs::msg::TransformStamped tf_stamped;
     tf_stamped.header.frame_id = odom_id;
     tf_stamped.child_frame_id = body_id;
@@ -147,17 +141,34 @@ public:
 
     tf_broadcaster.sendTransform(tf_stamped);
     last_stamped_tf2d = std::pair{current_time, bot_tf};
+
+    // Publish the track
+
+    geometry_msgs::msg::PoseStamped new_pose;
+    new_pose.pose = odom_msg.pose.pose;
+    new_pose.header.frame_id = odom_id;
+    new_pose.header.stamp = get_clock()->now();
+
+    odom_path_history.push_back(new_pose);
+    if (odom_path_history.size() >= kRobotPathHistorySize) {
+      odom_path_history.pop_front();
+    }
+    nav_msgs::msg::Path path_msg;
+    path_msg.header = new_pose.header;
+    path_msg.poses = std::vector<geometry_msgs::msg::PoseStamped>{odom_path_history.begin(),
+                                                                  odom_path_history.end()};
+    path_publisher_->publish(path_msg);
   }
 
-  void
-  init_pose_cb(const nuturtle_control::srv::InitPose::Request::SharedPtr req,
-               nuturtle_control::srv::InitPose::Response::SharedPtr) {
-    diff_bot.SetBodyConfig(
-        turtlelib::Transform2D{{req->x0, req->y0}, req->theta0});
+  void init_pose_cb(const nuturtle_control::srv::InitPose::Request::SharedPtr req,
+                    nuturtle_control::srv::InitPose::Response::SharedPtr) {
+    diff_bot.SetBodyConfig(turtlelib::Transform2D{{req->x0, req->y0}, req->theta0});
     return;
   }
 
 private:
+  constexpr static size_t kRobotPathHistorySize = 400; // number of data points
+
   std::string body_id;
   std::string odom_id;
   std::string wheel_left;
@@ -169,9 +180,15 @@ private:
   turtlelib::DiffDrive diff_bot;
   tf2_ros::TransformBroadcaster tf_broadcaster;
   std::pair<double, turtlelib::Transform2D> last_stamped_tf2d;
+  std::deque<geometry_msgs::msg::PoseStamped> odom_path_history =
+      std::deque<geometry_msgs::msg::PoseStamped>(kRobotPathHistorySize);
+
+  // Service stuff
+  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher;
+  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_publisher_;
 
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr js_linstener;
-  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher;
+
   rclcpp::Service<nuturtle_control::srv::InitPose>::SharedPtr init_pose_srv;
 };
 

@@ -20,12 +20,17 @@
 
 
     <!-- Robot stuff -->
+    <node pkg="tf2_ros" exec="static_transform_publisher" name="world_odom_static_pub" 
+        args=" --frame-id nusim/world --child-frame-id odom"/>
 
     <!-- The NuSim special. so special remap for them -->
     <group if="$(eval ' \'$(var robot)\' == \'nusim\' ')">
 
         <!-- Special rviz2 for sim -->
-        <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share nuturtle_control)/config/simulation_run.rviz" if="$(eval '\'$(var use_rviz)\' ')" />
+        <node pkg="rviz2" exec="rviz2" 
+            args="-d $(find-pkg-share nuturtle_control)/config/simulation_run.rviz" 
+            if="$(eval '\'$(var use_rviz)\' ')">
+        </node>
 
         <!-- ODOM is reading from red, but publishing to blue robot -->
         <node pkg="nuturtle_control" exec="odometry" output="screen">
@@ -103,13 +108,6 @@
             <arg name="color" value="blue"/>
         </include>
     </group>
-
-
-    <!-- $(eval '<python_expr>') -->
-
-
-    <node pkg="tf2_ros" exec="static_transform_publisher" name="world_odom_static_pub" args=" --frame-id nusim/world --child-frame-id odom"/>
-
 
 
 </launch>

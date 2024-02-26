@@ -205,7 +205,7 @@ public:
     fake_sensor_publisher_ =
         create_publisher<visualization_msgs::msg::MarkerArray>("/fake_sensor", 10);
 
-    path_publisher =
+    path_publisher_ =
         create_publisher<nav_msgs::msg::Path>("red/path", 10);
 
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
@@ -317,7 +317,7 @@ private:
     nav_msgs::msg::Path path_msg;
     path_msg.header = new_pose.header;
     path_msg.poses = std::vector<geometry_msgs::msg::PoseStamped>{bot_path_history.begin(), bot_path_history.end()};
-    path_publisher->publish(path_msg);
+    path_publisher_->publish(path_msg);
 
     RCLCPP_DEBUG_STREAM(get_logger(), debug_ss.str());
   }
@@ -553,7 +553,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::UInt64>::SharedPtr time_step_publisher_;
   rclcpp::Publisher<nuturtlebot_msgs::msg::SensorData>::SharedPtr red_sensor_publisher_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr fake_sensor_publisher_;
-  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_publisher;
+  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_publisher_;
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
   rclcpp::Subscription<nuturtlebot_msgs::msg::WheelCommands>::SharedPtr wheel_cmd_listener_;
