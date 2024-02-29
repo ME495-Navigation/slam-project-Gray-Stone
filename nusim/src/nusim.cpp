@@ -198,43 +198,41 @@ public:
 
     PublishStaticObstacles(static_obstacles);
 
-    // Setup pub/sub 
+    // Setup pub/sub
     time_step_publisher_ = create_publisher<std_msgs::msg::UInt64>("~/timestep", 10);
     red_sensor_publisher_ =
         create_publisher<nuturtlebot_msgs::msg::SensorData>("red/sensor_data", 10);
     fake_sensor_publisher_ =
         create_publisher<visualization_msgs::msg::MarkerArray>("/fake_sensor", 10);
-
-    path_publisher_ =
-        create_publisher<nav_msgs::msg::Path>("red/path", 10);
-
+    path_publisher_ = create_publisher<nav_msgs::msg::Path>("red/path", 10);
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+
+    wheel_cmd_listener_ = create_subscription<nuturtlebot_msgs::msg::WheelCommands>(
+        "red/wheel_cmd", 10, std::bind(&NuSim::WheelCmdCb, this, std::placeholders::_1));
 
     // Setup srv/client
     reset_service_ = create_service<std_srvs::srv::Empty>(
         "~/reset",
         std::bind(&NuSim::reset_srv, this, std::placeholders::_1, std::placeholders::_2));
-
     teleport_service_ = create_service<nusim::srv::Teleport>(
         "~/teleport",
         std::bind(&NuSim::teleport_callback, this, std::placeholders::_1, std::placeholders::_2));
 
     // Setup timer and set things in motion.
     main_timer_ =
-        this->create_wall_timer(update_period, std::bind(&NuSim::main_timer_callback, this));
-
+        this->create_wall_timer(update_period, std::bind(&NuSim::MainTimerStep, this));
     // 5HZ update rate
     fake_sensor_timer_ = this->create_wall_timer(std::chrono::milliseconds{200},
-                                                 std::bind(&NuSim::fake_sensor_callback, this));
-    wheel_cmd_listener_ = create_subscription<nuturtlebot_msgs::msg::WheelCommands>(
-        "red/wheel_cmd", 10, std::bind(&NuSim::WheelCmdCb, this, std::placeholders::_1));
+                                                 std::bind(&NuSim::FakeSensorTimerStep, this));
+    sim_laser_timer_ = this->create_wall_timer(std::chrono::milliseconds{200},
+                                                 std::bind(&NuSim::SimLaserTimerStep, this));
   }
 
 private:
   // Private functions
 
   //! @brief Main timer callback function.
-  void main_timer_callback() {
+  void MainTimerStep() {
     std_msgs::msg::UInt64 time_step_msg;
     time_step_msg.data = ++time_step_;
     time_step_publisher_->publish(time_step_msg);
@@ -264,15 +262,13 @@ private:
     debug_ss << "wheel_cmd " << raw_cmd_vel << "\n";
     debug_ss << "wheel_vel " << wheel_cmd_vel << "\n";
     // inject noise between wheel command, and how much motor actually turned.
-    if (turtlelib::almost_equal(wheel_cmd_vel.left, 0)) {
+    if (! turtlelib::almost_equal(wheel_cmd_vel.left, 0)) {
       wheel_cmd_vel.left += input_gauss_distribution(rand_eng);
     }
-    if (turtlelib::almost_equal(wheel_cmd_vel.right, 0)) {
+    if (! turtlelib::almost_equal(wheel_cmd_vel.right, 0)) {
       wheel_cmd_vel.left += input_gauss_distribution(rand_eng);
     }
-
     debug_ss << "wheel_vel with noise" << wheel_cmd_vel << "\n";
-
     red_bot.UpdateBodyConfigWithVel(wheel_cmd_vel);
     debug_ss << "new bot body " << red_bot.GetBodyConfig() << "\n";
 
@@ -322,7 +318,7 @@ private:
     RCLCPP_DEBUG_STREAM(get_logger(), debug_ss.str());
   }
 
-  void fake_sensor_callback() {
+  void FakeSensorTimerStep() {
     visualization_msgs::msg::MarkerArray msg;
     size_t i = 0;
     for (const auto &obs : static_obstacles) {
@@ -354,6 +350,10 @@ private:
     }
 
     fake_sensor_publisher_->publish(msg);
+  }
+
+  void SimLaserTimerStep(){
+
   }
 
   //! @brief service callback for reset
@@ -546,6 +546,7 @@ private:
   // Ros objects
   rclcpp::TimerBase::SharedPtr main_timer_;
   rclcpp::TimerBase::SharedPtr fake_sensor_timer_;
+  rclcpp::TimerBase::SharedPtr sim_laser_timer_;
   
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr reset_service_;
   rclcpp::Service<nusim::srv::Teleport>::SharedPtr teleport_service_;
