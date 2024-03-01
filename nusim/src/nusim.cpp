@@ -78,6 +78,8 @@
 #include "leo_ros_utils/param_helper.hpp"
 #include "leo_ros_utils/math_helper.hpp"
 #include <geometry_msgs/msg/pose_with_covariance.hpp>
+#include <sensor_msgs/msg/laser_scan.hpp>
+
 
 namespace {
 
@@ -117,6 +119,15 @@ std::vector<visualization_msgs::msg::Marker> GenObstacles(std::vector<double> x_
   }
   return out;
 }
+
+struct LaserParam{
+  double range_max;
+  double range_min;
+  double angle_increment;
+  int number_of_sample;
+  double resolution;
+  double noise_level;
+};
 
 const std::string kWorldFrame = "nusim/world";
 const std::string kSimRobotBaseFrameID = "red/base_footprint";
@@ -176,6 +187,28 @@ public:
                                    "obsticle. negative will disable max range",
                                    -1.0)),
 
+//   double range_max;
+  // double range_min;
+  // double angle_increment;
+  // double number_of_sample;
+  // double resolution;
+  // double noise_level;
+
+        sim_laser_param({
+        GetParam<double>(*this, "laser_range_max",
+                                       "max range of sim laser scan", 10),
+        GetParam<double>(*this, "laser_range_min",
+                                       "min range of sim laser scan", 0),
+        GetParam<double>(*this, "laser_angle_increment",
+                                       "angular distance between each laser measurement.", 0.5),
+        GetParam<int>(*this, "laser_number_of_sample",
+                                       "number of laser samples.", 1),
+        GetParam<double>(*this, "laser_resolution",
+                                       "resolution of the laser", 0.001),
+        GetParam<double>(*this, "laser_noise_level",
+                                       "nose level of laser measurement.", 0),
+        
+        }),
         // Member variable, not param
         input_gauss_distribution(0.0, input_noise),
         wheel_uniform_distribution(-slip_fraction, slip_fraction),
@@ -205,6 +238,7 @@ public:
     fake_sensor_publisher_ =
         create_publisher<visualization_msgs::msg::MarkerArray>("/fake_sensor", 10);
     path_publisher_ = create_publisher<nav_msgs::msg::Path>("red/path", 10);
+    sim_laser_publisher_ = create_publisher<sensor_msgs::msg::LaserScan>("~/laser_scan" , 10);
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
     wheel_cmd_listener_ = create_subscription<nuturtlebot_msgs::msg::WheelCommands>(
@@ -353,7 +387,101 @@ private:
   }
 
   void SimLaserTimerStep(){
+    sensor_msgs::msg::LaserScan laser_msg;
 
+
+    // TODO check if we need to emit laser scan from tip of robot
+    laser_msg.header.frame_id = kSimRobotBaseFrameID; 
+    laser_msg.header.stamp = get_clock()->now();
+    
+    laser_msg.angle_min = 0;
+    laser_msg.angle_max = sim_laser_param.angle_increment;
+    laser_msg.angle_increment = sim_laser_param.angle_increment;
+
+    laser_msg.time_increment = 0;
+    laser_msg.scan_time = 0;
+
+    laser_msg.range_min = sim_laser_param.range_min;
+    laser_msg.range_max = sim_laser_param.range_max;
+
+    laser_msg.ranges.push_back(1.0);
+    laser_msg.ranges.push_back(1.5);
+
+
+    sim_laser_publisher_->publish(laser_msg);
+    
+  }
+
+  //! @param ray_angle_body - angle of the ray in body frame.
+
+  std::optional<double> ray_obstacle_check(double ray_angle_world, turtlelib::Vector2D v_bot_obs) {
+
+    if (v_bot_obs.magnitude() - obstacles_r > sim_laser_param.range_max) {
+      // Don't care if obstacle is 100% too far away.
+      return std::nullopt;
+    }
+
+    // Unit vector ray in world
+    auto V_ray_unit =
+        turtlelib::Vector2D{std::cos(ray_angle_world), std::sin(ray_angle_world)}.normalize();
+
+    double ray_obs_angle = turtlelib::angle(v_bot_obs, V_ray_unit);
+
+    // Unless ray origin is inside the obstacle. They won't intersect (regardless how big the
+    // circle is) if circle center is not in "front" +-90 of ray.
+    if (std::abs(ray_obs_angle) > 90) {
+      // This is 50% of the case. for each obstacle, half the ray will skip out here.
+      return std::nullopt;
+    }
+
+    // ############# Begin Citation [6]#############
+    // Project bot_obs onto ray, length of U1 in citation graph
+    double proj_obs_ray_mag = turtlelib::dot(v_bot_obs, V_ray_unit);
+    // ############# End Citation [6]#############
+
+    // According to citation, we should project, But since we already have the angle. We can one
+    // step to get distance D
+    double circle_to_ray_d = std::abs(std::sin(ray_obs_angle) * v_bot_obs.magnitude());
+    if (circle_to_ray_d > obstacles_r) {
+      // This is the case of not intersect
+      return std::nullopt;
+    }
+    // Then we can form the small triangle
+    double intersect_offset =
+        std::sqrt(obstacles_r * obstacles_r - circle_to_ray_d * circle_to_ray_d);
+    // This (proj_obs_ray_mag - intersect_offset) *V_ray_unit is the vector to the
+    // closest intersect. It should be positive!
+    double ray_length = (proj_obs_ray_mag - intersect_offset);
+    if (ray_length < 0.0) {
+      RCLCPP_ERROR_STREAM(get_logger(), "Intersection behind the ray! dist: "
+                                            << ray_length << "\n Ray unit vector: " << V_ray_unit
+                                            << " bot to obs vector: " << v_bot_obs
+                                            << "\n projected length on ray " << proj_obs_ray_mag
+                                            << " obs to ray dis: " << circle_to_ray_d);
+    }
+
+    return ray_length;
+  }
+  //! @param ray_angle_body - angle of the ray in body frame.
+  std::optional<double> check_all_obstacle(double ray_angle_body) {
+
+    // We put all calculation in world frame, then convert back to body. Its easier for walls. 
+
+    auto bot_config = red_bot.GetBodyConfig();
+
+    double ray_angle_world = ray_angle_body + bot_config.rotation();
+
+    // It's safe to assume this. If we have intersect further then this, we want to discard that
+    // anyway
+    double closest_intersect = sim_laser_param.range_max +1;
+    for (const auto & obs : static_obstacles){
+      // robot to obs center
+      auto maybe_point = ray_obstacle_check(
+          ray_angle_world, turtlelib::Vector2D{obs.pose.position.x, obs.pose.position.y} -
+                               bot_config.translation());
+      // using short circuit in if here
+      if (maybe_point.has_value() && maybe_point.value()<  )
+    }
   }
 
   //! @brief service callback for reset
@@ -533,6 +661,7 @@ private:
   const double input_noise;
   const double slip_fraction;
   const double max_range;
+  const LaserParam sim_laser_param;
   // These are member variable
   std::normal_distribution<double> input_gauss_distribution;
   std::uniform_real_distribution<double> wheel_uniform_distribution;
@@ -555,6 +684,7 @@ private:
   rclcpp::Publisher<nuturtlebot_msgs::msg::SensorData>::SharedPtr red_sensor_publisher_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr fake_sensor_publisher_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_publisher_;
+  rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr sim_laser_publisher_;
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
   rclcpp::Subscription<nuturtlebot_msgs::msg::WheelCommands>::SharedPtr wheel_cmd_listener_;
