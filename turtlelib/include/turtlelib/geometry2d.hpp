@@ -88,6 +88,14 @@ struct Vector2D {
   //! @return magnitude in double
   double magnitude() const;
 
+  //! @brief return a point at the tip of the vector
+  //! @return the point
+  Point2D ToPoint() const;
+
+  //! @brief return a vector that's perpendicular to this
+  //! return: vector rotated 90deg
+  Vector2D Perpendicular() const;
+
   //! @brief Self increment operator, add current vector by given vector
   //! @param rhs Vector to add to the back
   //! @return This vector itself.

@@ -49,6 +49,12 @@ https://stackoverflow.com/questions/12261915/how-to-throw-stdexceptions-with-var
 Circle ray intersection using projection.
 https://www.bluebill.net/circle_ray_intersection.html#example
 
+############# Citation [7]#############
+2024-03-01T16:43:30Z-06
+Line intersection math
+https://stackoverflow.com/a/4030884
+
+
 ## Other references
 
 https://robotics.stackexchange.com/questions/24000/how-do-you-automate-fixing-formatting-errors-found-by-ament-cpplint

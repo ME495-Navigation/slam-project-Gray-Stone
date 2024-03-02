@@ -33,6 +33,9 @@ Vector2D Vector2D::normalize() const {
 
 double Vector2D::magnitude() const { return std::sqrt(x * x + y * y); }
 
+Point2D Vector2D::ToPoint() const { return {x, y}; }
+Vector2D Vector2D::Perpendicular() const { return {-y, x}; }
+
 Vector2D operator-(const Point2D &head, const Point2D &tail) {
   return {head.x - tail.x, head.y - tail.y};
 }

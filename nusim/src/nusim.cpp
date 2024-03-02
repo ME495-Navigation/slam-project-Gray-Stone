@@ -49,9 +49,9 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_ros/transform_broadcaster.h>
 
-#include <deque>
 #include <atomic>
 #include <chrono>
+#include <deque>
 #include <functional>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <memory>
@@ -72,14 +72,13 @@
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
-#include <nav_msgs/msg/path.hpp>
 #include "nusim/srv/teleport.hpp"
+#include <nav_msgs/msg/path.hpp>
 
-#include "leo_ros_utils/param_helper.hpp"
 #include "leo_ros_utils/math_helper.hpp"
+#include "leo_ros_utils/param_helper.hpp"
 #include <geometry_msgs/msg/pose_with_covariance.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
-
 
 namespace {
 
@@ -120,7 +119,7 @@ std::vector<visualization_msgs::msg::Marker> GenObstacles(std::vector<double> x_
   return out;
 }
 
-struct LaserParam{
+struct LaserParam {
   double range_max;
   double range_min;
   double angle_increment;
@@ -128,6 +127,17 @@ struct LaserParam{
   double resolution;
   double noise_level;
 };
+
+std::vector<std::pair<turtlelib::Point2D, turtlelib::Point2D>> ArenaCorners(double x_len,
+                                                                            double y_len) {
+  //
+  return {
+      {{x_len / 2, y_len / 2}, {-x_len / 2, y_len / 2}},   // top
+      {{-x_len / 2, y_len / 2}, {-x_len / 2, -y_len / 2}}, // left
+      {{-x_len / 2, -y_len / 2}, {x_len / 2, -y_len / 2}}, // btm
+      {{x_len / 2, -y_len / 2}, {x_len / 2, y_len / 2}}    // right
+  };
+}
 
 const std::string kWorldFrame = "nusim/world";
 const std::string kSimRobotBaseFrameID = "red/base_footprint";
@@ -162,6 +172,7 @@ public:
             turtlelib::Transform2D{{x0, y0}, theta0}}),
         obstacles_r(GetParam<double>(*this, "obstacles/r", "obstacle radius")),
 
+
         // This is quite a crazy hack. Using trinary statement and lambda to do it inside initializer
         // So we can do const on this object.
         static_obstacles(
@@ -177,6 +188,8 @@ public:
                   throw;
                   return std::vector<visualization_msgs::msg::Marker>{};
                   }()),
+        arena_corners(ArenaCorners(GetParam<double>(*this, "arena_x_length", "x length of arena", 5.0),GetParam<double>(*this, "arena_y_length", "x length of arena", 3.0))),
+
         // Simulation only params
         input_noise(GetParam<double>(*this, "input_noise",
                                      "input noise variance when applying wheel velocity", 0)),
@@ -187,27 +200,19 @@ public:
                                    "obsticle. negative will disable max range",
                                    -1.0)),
 
-//   double range_max;
-  // double range_min;
-  // double angle_increment;
-  // double number_of_sample;
-  // double resolution;
-  // double noise_level;
-
         sim_laser_param({
         GetParam<double>(*this, "laser_range_max",
-                                       "max range of sim laser scan", 10),
+                                       "max range of sim laser scan", 3.5),
         GetParam<double>(*this, "laser_range_min",
-                                       "min range of sim laser scan", 0),
+                                       "min range of sim laser scan", 0.12),
         GetParam<double>(*this, "laser_angle_increment",
-                                       "angular distance between each laser measurement.", 0.5),
+                                       "angular distance between each laser measurement.", (turtlelib::PI *2 ) / 360),
         GetParam<int>(*this, "laser_number_of_sample",
-                                       "number of laser samples.", 1),
+                                       "number of laser samples.", 360),
         GetParam<double>(*this, "laser_resolution",
-                                       "resolution of the laser", 0.001),
+                                       "resolution of the laser", 0.0174533),
         GetParam<double>(*this, "laser_noise_level",
                                        "nose level of laser measurement.", 0),
-        
         }),
         // Member variable, not param
         input_gauss_distribution(0.0, input_noise),
@@ -222,11 +227,9 @@ public:
     // RCUTILS_LOG_SEVERITY_DEBUG);
 
     // Arena wall stuff
-    const double arena_x_length =
-        GetParam<double>(*this, "arena_x_length", "x length of arena", 5.0);
-    const double arena_y_length =
-        GetParam<double>(*this, "arena_y_length", "x length of arena", 3.0);
-
+    const double arena_x_length = get_parameter("arena_x_length").get_value<double>();
+    const double arena_y_length = get_parameter("arena_y_length").get_value<double>();
+    // It's a lot more code to change if I change it to use corner pair lists
     PublishArenaWalls(arena_x_length, arena_y_length);
 
     PublishStaticObstacles(static_obstacles);
@@ -238,7 +241,7 @@ public:
     fake_sensor_publisher_ =
         create_publisher<visualization_msgs::msg::MarkerArray>("/fake_sensor", 10);
     path_publisher_ = create_publisher<nav_msgs::msg::Path>("red/path", 10);
-    sim_laser_publisher_ = create_publisher<sensor_msgs::msg::LaserScan>("~/laser_scan" , 10);
+    sim_laser_publisher_ = create_publisher<sensor_msgs::msg::LaserScan>("~/laser_scan", 10);
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
     wheel_cmd_listener_ = create_subscription<nuturtlebot_msgs::msg::WheelCommands>(
@@ -253,13 +256,17 @@ public:
         std::bind(&NuSim::teleport_callback, this, std::placeholders::_1, std::placeholders::_2));
 
     // Setup timer and set things in motion.
-    main_timer_ =
-        this->create_wall_timer(update_period, std::bind(&NuSim::MainTimerStep, this));
+    main_timer_ = this->create_wall_timer(update_period, std::bind(&NuSim::MainTimerStep, this));
     // 5HZ update rate
     fake_sensor_timer_ = this->create_wall_timer(std::chrono::milliseconds{200},
                                                  std::bind(&NuSim::FakeSensorTimerStep, this));
-    sim_laser_timer_ = this->create_wall_timer(std::chrono::milliseconds{200},
+    if (sim_laser_param.number_of_sample > 0) {
+      sim_laser_timer_ = this->create_wall_timer(std::chrono::milliseconds{200},
                                                  std::bind(&NuSim::SimLaserTimerStep, this));
+    } else {
+      RCLCPP_WARN_STREAM(get_logger(),
+                         "Requested 0 samples in sim laser ! will not publish this at all");
+    }
   }
 
 private:
@@ -296,10 +303,10 @@ private:
     debug_ss << "wheel_cmd " << raw_cmd_vel << "\n";
     debug_ss << "wheel_vel " << wheel_cmd_vel << "\n";
     // inject noise between wheel command, and how much motor actually turned.
-    if (! turtlelib::almost_equal(wheel_cmd_vel.left, 0)) {
+    if (!turtlelib::almost_equal(wheel_cmd_vel.left, 0)) {
       wheel_cmd_vel.left += input_gauss_distribution(rand_eng);
     }
-    if (! turtlelib::almost_equal(wheel_cmd_vel.right, 0)) {
+    if (!turtlelib::almost_equal(wheel_cmd_vel.right, 0)) {
       wheel_cmd_vel.left += input_gauss_distribution(rand_eng);
     }
     debug_ss << "wheel_vel with noise" << wheel_cmd_vel << "\n";
@@ -337,16 +344,17 @@ private:
     // Publish the robot track path.
     geometry_msgs::msg::PoseStamped new_pose;
     new_pose.pose = leo_ros_utils::Convert(red_bot.GetBodyConfig());
-    new_pose.header.frame_id =kWorldFrame;
+    new_pose.header.frame_id = kWorldFrame;
     new_pose.header.stamp = get_clock()->now();
-     
-    bot_path_history.push_back(new_pose  );
-    if (bot_path_history.size() >= kRobotPathHistorySize){
+
+    bot_path_history.push_back(new_pose);
+    if (bot_path_history.size() >= kRobotPathHistorySize) {
       bot_path_history.pop_front();
     }
     nav_msgs::msg::Path path_msg;
     path_msg.header = new_pose.header;
-    path_msg.poses = std::vector<geometry_msgs::msg::PoseStamped>{bot_path_history.begin(), bot_path_history.end()};
+    path_msg.poses = std::vector<geometry_msgs::msg::PoseStamped>{bot_path_history.begin(),
+                                                                  bot_path_history.end()};
     path_publisher_->publish(path_msg);
 
     RCLCPP_DEBUG_STREAM(get_logger(), debug_ss.str());
@@ -376,7 +384,7 @@ private:
       obstacle_marker.pose.position.x = new_loc.x + basic_sensor_gauss_distribution(rand_eng);
       obstacle_marker.pose.position.y = new_loc.y + basic_sensor_gauss_distribution(rand_eng);
       obstacle_marker.scale.z = 0.4;
-      obstacle_marker.pose.position.z = 0.4/2;
+      obstacle_marker.pose.position.z = 0.4 / 2;
       obstacle_marker.color.g = 1.0;
       obstacle_marker.color.a = 0.4;
 
@@ -386,16 +394,14 @@ private:
     fake_sensor_publisher_->publish(msg);
   }
 
-  void SimLaserTimerStep(){
+  void SimLaserTimerStep() {
     sensor_msgs::msg::LaserScan laser_msg;
 
-
     // TODO check if we need to emit laser scan from tip of robot
-    laser_msg.header.frame_id = kSimRobotBaseFrameID; 
+    laser_msg.header.frame_id = kSimRobotBaseFrameID;
     laser_msg.header.stamp = get_clock()->now();
-    
+
     laser_msg.angle_min = 0;
-    laser_msg.angle_max = sim_laser_param.angle_increment;
     laser_msg.angle_increment = sim_laser_param.angle_increment;
 
     laser_msg.time_increment = 0;
@@ -403,45 +409,39 @@ private:
 
     laser_msg.range_min = sim_laser_param.range_min;
     laser_msg.range_max = sim_laser_param.range_max;
-
-    laser_msg.ranges.push_back(1.0);
-    laser_msg.ranges.push_back(1.5);
-
-
+    double current_angle = 0.0; // need to use it for the max value
+    for (int count = 0; count < sim_laser_param.number_of_sample;
+         count++, current_angle += sim_laser_param.angle_increment) {
+      auto maybe_dist = ray_hitting(count * sim_laser_param.angle_increment);
+      laser_msg.ranges.push_back(maybe_dist.value_or(sim_laser_param.range_max));
+    }
+    // This assume angle_max is inclusive
+    // assume number of sample is >1 (which is checked in constructor)
+    laser_msg.angle_max = (sim_laser_param.number_of_sample - 1) * sim_laser_param.angle_increment;
     sim_laser_publisher_->publish(laser_msg);
-    
   }
 
   //! @param ray_angle_body - angle of the ray in body frame.
 
-  std::optional<double> ray_obstacle_check(double ray_angle_world, turtlelib::Vector2D v_bot_obs) {
+  std::optional<double> ray_obstacle_check(turtlelib::Vector2D v_ray_unit,
+                                           turtlelib::Vector2D v_bot_obs) {
 
     if (v_bot_obs.magnitude() - obstacles_r > sim_laser_param.range_max) {
       // Don't care if obstacle is 100% too far away.
       return std::nullopt;
     }
 
-    // Unit vector ray in world
-    auto V_ray_unit =
-        turtlelib::Vector2D{std::cos(ray_angle_world), std::sin(ray_angle_world)}.normalize();
-
-    double ray_obs_angle = turtlelib::angle(v_bot_obs, V_ray_unit);
-
+    // ############# Begin Citation [6]#############
+    // Project bot_obs onto ray, length of U1 in citation graph
+    double proj_obs_ray_mag = turtlelib::dot(v_bot_obs, v_ray_unit);
     // Unless ray origin is inside the obstacle. They won't intersect (regardless how big the
     // circle is) if circle center is not in "front" +-90 of ray.
-    if (std::abs(ray_obs_angle) > 90) {
+    // IF the projected magnitude negative, the obs is behind the ray.
+    if (proj_obs_ray_mag < 0.0) {
       // This is 50% of the case. for each obstacle, half the ray will skip out here.
       return std::nullopt;
     }
-
-    // ############# Begin Citation [6]#############
-    // Project bot_obs onto ray, length of U1 in citation graph
-    double proj_obs_ray_mag = turtlelib::dot(v_bot_obs, V_ray_unit);
-    // ############# End Citation [6]#############
-
-    // According to citation, we should project, But since we already have the angle. We can one
-    // step to get distance D
-    double circle_to_ray_d = std::abs(std::sin(ray_obs_angle) * v_bot_obs.magnitude());
+    double circle_to_ray_d = (v_bot_obs - proj_obs_ray_mag * v_ray_unit).magnitude();
     if (circle_to_ray_d > obstacles_r) {
       // This is the case of not intersect
       return std::nullopt;
@@ -449,12 +449,14 @@ private:
     // Then we can form the small triangle
     double intersect_offset =
         std::sqrt(obstacles_r * obstacles_r - circle_to_ray_d * circle_to_ray_d);
-    // This (proj_obs_ray_mag - intersect_offset) *V_ray_unit is the vector to the
+    // ############# End Citation [6]#############
+
+    // This (proj_obs_ray_mag - intersect_offset) *v_ray_unit is the vector to the
     // closest intersect. It should be positive!
     double ray_length = (proj_obs_ray_mag - intersect_offset);
     if (ray_length < 0.0) {
       RCLCPP_ERROR_STREAM(get_logger(), "Intersection behind the ray! dist: "
-                                            << ray_length << "\n Ray unit vector: " << V_ray_unit
+                                            << ray_length << "\n Ray unit vector: " << v_ray_unit
                                             << " bot to obs vector: " << v_bot_obs
                                             << "\n projected length on ray " << proj_obs_ray_mag
                                             << " obs to ray dis: " << circle_to_ray_d);
@@ -462,26 +464,112 @@ private:
 
     return ray_length;
   }
+
+  std::optional<double> ray_wall_check(turtlelib::Vector2D v_ray_unit,
+                 std::pair<turtlelib::Point2D, turtlelib::Point2D> wall_endpoints,
+                 turtlelib::Point2D bot_loc) {
+
+    // ############# Citation [7]#############
+    // Also see doc/Line_Ray_intersect_math.md for the full math.
+
+    // clang-format off
+    //                            ray_direction              P2                     
+    //                           ^                      ---->                       
+    //                           |              -------/    >                       
+    //                           |      -------/          -/ ^                      
+    //                          -x-----/                 /   |                      
+    //                  -------/ | intersect            /    |                      
+    //    P1    -------/         |                    -/     |                      
+    //     <---/                 |                   /       |                      
+    //       <                   |                  /        |                      
+    //     ^  \-                 |                -/ V_a2    |                      
+    //     |    \                |               /           |                      
+    //     |     \-              |              /            |                      
+    //     |       \ V_a1        |            -/             |                      
+    //     |        \-           |           /               |                      
+    //     |          \          |         -/                |V_b2                  
+    // V_b1|           \         |        /                  |                      
+    //     |            \-       |       /                   |                      
+    //     |              \      |     -/                    |                      
+    //     |               \-    |    /                      |                      
+    //     |                 \   |   /                       |                      
+    //     |   V_c1           \- | -/         V_c2           |        Normal to ray 
+    //     <------------------- \|---------------------------->---------->          
+    //                            P                                                 
+    //
+    // clang-format on 
+    // Bot loc is our p
+    
+    turtlelib::Vector2D v_a1 = wall_endpoints.first - bot_loc;
+    turtlelib::Vector2D v_a2 = wall_endpoints.second - bot_loc;
+
+    auto b1_proj = turtlelib::dot(v_a1, v_ray_unit);
+    auto b2_proj = turtlelib::dot(v_a2, v_ray_unit);
+    if (b1_proj <0 && b2_proj <0) {
+      // This is the case the entire line is behind the ray
+      return std::nullopt;
+    }
+    auto v_ray_perp = v_ray_unit.Perpendicular();
+
+    auto c1_proj = turtlelib::dot(v_a1, v_ray_perp);
+    auto c2_proj = turtlelib::dot(v_a2, v_ray_perp);
+    // don't know any better way for same sign check
+    if (c1_proj * c2_proj <0 ) {
+      // This is the case the entire line is off to one side of the ray
+      return std::nullopt;
+    }
+
+    double c1_mag = std::abs(c1_proj);
+    double c2_mag = std::abs(c2_proj);
+    auto x = (c1_mag * (b2_proj - b1_proj)) / (c1_mag + c2_mag);
+  return x + b1_proj;
+  }
+
+
   //! @param ray_angle_body - angle of the ray in body frame.
-  std::optional<double> check_all_obstacle(double ray_angle_body) {
+  std::optional<double> ray_hitting(double ray_angle_body) {
 
-    // We put all calculation in world frame, then convert back to body. Its easier for walls. 
-
+    // We put all calculation in world frame. Its easier for walls.
+    // We only need a magnitude measure along a vector ray, so frame is not the problem.
     auto bot_config = red_bot.GetBodyConfig();
-
     double ray_angle_world = ray_angle_body + bot_config.rotation();
 
-    // It's safe to assume this. If we have intersect further then this, we want to discard that
-    // anyway
-    double closest_intersect = sim_laser_param.range_max +1;
-    for (const auto & obs : static_obstacles){
+    std::optional<double> closest_intersect = std::nullopt;
+
+    // Unit vector ray in world
+    auto v_ray_unit =
+        turtlelib::Vector2D{std::cos(ray_angle_world), std::sin(ray_angle_world)}.normalize();
+
+
+    for (const auto &obs : static_obstacles) {
       // robot to obs center
       auto maybe_point = ray_obstacle_check(
-          ray_angle_world, turtlelib::Vector2D{obs.pose.position.x, obs.pose.position.y} -
-                               bot_config.translation());
+          v_ray_unit,
+          turtlelib::Vector2D{obs.pose.position.x, obs.pose.position.y} - bot_config.translation());
       // using short circuit in if here
-      if (maybe_point.has_value() && maybe_point.value()<  )
+      if (maybe_point.has_value() &&
+          maybe_point.value() < closest_intersect.value_or(sim_laser_param.range_max + 1)) {
+        // It's safe to assume this. If we have intersect further then this, we want to discard that
+        // anyway
+        // The fun part of this is if the ray hits nothing, it will still be nullopt
+        closest_intersect = maybe_point.value();
+      }
     }
+
+    if (! closest_intersect.has_value()){
+      for ( const auto & wall_corner_pair : arena_corners){
+
+      auto maybe_length = ray_wall_check(v_ray_unit  ,wall_corner_pair, bot_config.translation().ToPoint() );
+      if (maybe_length.has_value()){
+        closest_intersect = maybe_length.value();
+        break;
+      }
+
+      } 
+      
+
+    }
+    return closest_intersect;
   }
 
   //! @brief service callback for reset
@@ -656,7 +744,8 @@ private:
   // change Obstacle constructed using input x_s and y_s Due to check needed on
   // x_s and y_s, not const
   const std::vector<visualization_msgs::msg::Marker> static_obstacles;
-
+  
+  const std::vector<std::pair<turtlelib::Point2D,turtlelib::Point2D>> arena_corners;
   // simulation only param
   const double input_noise;
   const double slip_fraction;
