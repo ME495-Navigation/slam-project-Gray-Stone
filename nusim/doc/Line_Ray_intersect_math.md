@@ -48,7 +48,22 @@ note: $V_{ray}$ and $P_{norm}$ are both unit vector
 
 ## Check for intersection
 
-To check for intersection, we compare the direction of $V_{c1}$ and $V_{c2}$ (or the sign of $V_a \cdot P_{norm}$, as dot product gives directional magnitude after projection). This check will also give intersect result if both points are behind the line. Thus we also need to check for that. Could use the same doc product trick ${V_a} \cdot \hat{V_{ray}}$, negative means it's behind the ray and should be skipped.
+To check for intersection, we compare the direction of $V_{c1}$ and $V_{c2}$ (or the sign of $V_a \cdot P_{norm}$, as dot product gives directional magnitude after projection). This check will also give intersect result if both points are behind the line. Thus we also need to check for that. Could use the same dot product trick ${V_a} \cdot \hat{V_{ray}}$, negative means it's behind the ray and should be skipped.
+
+However there is an special case where the above conditions are both satisfied but still no intersection.
+
+```
+             ^               
+             |               
+--\          |               
+   ---\      |               
+       ----\                 
+            ----\            
+                 ---\        
+                     ---     
+```
+
+This is a very special case where we can only check after computing the intersect distance.
 
 <div style="page-break-after: always;"></div>
 
@@ -102,3 +117,5 @@ $$ intersect\ length = { c_1 (b_2-b_1) \over (c_1+c_2) } + b_1 $$
 This math  will work in both case where $b_1>b_2$ or $b_1< b_2$. In the second case, $x$ will be negative and subtract from $b_1$ will effectively "extend" it. 
 
 There is a third case not drawn, which is $b_1$ and $b_2$ having opposite direction. The same math hold, as long as $b$ is a signed value (negative when it's going in opposite direction of the ray).
+
+**Remember to check for negative intersect distance. That will catch the third case of no intersect**

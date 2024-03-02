@@ -270,17 +270,17 @@ Visualization Manager:
         Value: /nusim/walls
       Value: true
     - Class: rviz_default_plugins/MarkerArray
-      Enabled: true
+      Enabled: false
       Name: MarkerArray
       Namespaces:
-        "": true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /fake_sensor
-      Value: true
+      Value: false
     - Alpha: 1
       Buffer Length: 1
       Class: rviz_default_plugins/Path
@@ -340,8 +340,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: -9999
-        Min Value: 9999
+        Max Value: 2.5
+        Min Value: -6.556708598282057e-08
         Value: true
       Axis: X
       Channel Name: intensity
@@ -417,25 +417,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 2.737865924835205
+      Distance: 5.6177520751953125
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.30220359563827515
-        Y: 0.2988634705543518
-        Z: 0.19303329288959503
+        X: -0.7369050979614258
+        Y: 0.4873747229576111
+        Z: 0.10301470756530762
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.5697963237762451
+      Pitch: 1.0395469665527344
       Target Frame: <Fixed Frame>
-      Value: Orbit (rviz)
-      Yaw: 2.7435665130615234
+      Value: Orbit (rviz_default_plugins)
+      Yaw: 3.112074851989746
     Saved: ~
 Window Geometry:
   Displays:

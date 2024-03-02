@@ -132,10 +132,10 @@ std::vector<std::pair<turtlelib::Point2D, turtlelib::Point2D>> ArenaCorners(doub
                                                                             double y_len) {
   //
   return {
-      {{x_len / 2, y_len / 2}, {-x_len / 2, y_len / 2}},   // top
-      {{-x_len / 2, y_len / 2}, {-x_len / 2, -y_len / 2}}, // left
-      {{-x_len / 2, -y_len / 2}, {x_len / 2, -y_len / 2}}, // btm
-      {{x_len / 2, -y_len / 2}, {x_len / 2, y_len / 2}}    // right
+      {{x_len / 2, y_len / 2}, {-x_len / 2, y_len / 2}},   // right
+      {{-x_len / 2, y_len / 2}, {-x_len / 2, -y_len / 2}}, // btm
+      {{-x_len / 2, -y_len / 2}, {x_len / 2, -y_len / 2}}, // left
+      {{x_len / 2, -y_len / 2}, {x_len / 2, y_len / 2}}    // top
   };
 }
 
@@ -409,11 +409,10 @@ private:
 
     laser_msg.range_min = sim_laser_param.range_min;
     laser_msg.range_max = sim_laser_param.range_max;
-    double current_angle = 0.0; // need to use it for the max value
-    for (int count = 0; count < sim_laser_param.number_of_sample;
-         count++, current_angle += sim_laser_param.angle_increment) {
+    for (int count = 0; count < sim_laser_param.number_of_sample; count++) {
       auto maybe_dist = ray_hitting(count * sim_laser_param.angle_increment);
-      laser_msg.ranges.push_back(maybe_dist.value_or(sim_laser_param.range_max));
+      // TODO revert this after debug
+      laser_msg.ranges.push_back(maybe_dist.value_or(sim_laser_param.range_max - 1));
     }
     // This assume angle_max is inclusive
     // assume number of sample is >1 (which is checked in constructor)
@@ -434,11 +433,13 @@ private:
     // ############# Begin Citation [6]#############
     // Project bot_obs onto ray, length of U1 in citation graph
     double proj_obs_ray_mag = turtlelib::dot(v_bot_obs, v_ray_unit);
-    // Unless ray origin is inside the obstacle. They won't intersect (regardless how big the
-    // circle is) if circle center is not in "front" +-90 of ray.
-    // IF the projected magnitude negative, the obs is behind the ray.
+    // Unless ray origin is inside the obstacle. They won't intersect
+    // (regardless how big the circle is) if circle center is not in "front"
+    // +-90 of ray. IF the projected magnitude negative, the obs is behind the
+    // ray.
     if (proj_obs_ray_mag < 0.0) {
-      // This is 50% of the case. for each obstacle, half the ray will skip out here.
+      // This is 50% of the case. for each obstacle, half the ray will skip out
+      // here.
       return std::nullopt;
     }
     double circle_to_ray_d = (v_bot_obs - proj_obs_ray_mag * v_ray_unit).magnitude();
@@ -451,8 +452,8 @@ private:
         std::sqrt(obstacles_r * obstacles_r - circle_to_ray_d * circle_to_ray_d);
     // ############# End Citation [6]#############
 
-    // This (proj_obs_ray_mag - intersect_offset) *v_ray_unit is the vector to the
-    // closest intersect. It should be positive!
+    // This (proj_obs_ray_mag - intersect_offset) *v_ray_unit is the vector to
+    // the closest intersect. It should be positive!
     double ray_length = (proj_obs_ray_mag - intersect_offset);
     if (ray_length < 0.0) {
       RCLCPP_ERROR_STREAM(get_logger(), "Intersection behind the ray! dist: "
@@ -465,7 +466,8 @@ private:
     return ray_length;
   }
 
-  std::optional<double> ray_wall_check(turtlelib::Vector2D v_ray_unit,
+  std::optional<double>
+  ray_wall_check(turtlelib::Vector2D v_ray_unit,
                  std::pair<turtlelib::Point2D, turtlelib::Point2D> wall_endpoints,
                  turtlelib::Point2D bot_loc) {
 
@@ -497,34 +499,47 @@ private:
     //     <------------------- \|---------------------------->---------->          
     //                            P                                                 
     //
-    // clang-format on 
+    // clang-format on
     // Bot loc is our p
-    
+    auto v_ray_perp = v_ray_unit.Perpendicular();
+
     turtlelib::Vector2D v_a1 = wall_endpoints.first - bot_loc;
     turtlelib::Vector2D v_a2 = wall_endpoints.second - bot_loc;
 
     auto b1_proj = turtlelib::dot(v_a1, v_ray_unit);
     auto b2_proj = turtlelib::dot(v_a2, v_ray_unit);
-    if (b1_proj <0 && b2_proj <0) {
+    if (b1_proj < 0 && b2_proj < 0) {
       // This is the case the entire line is behind the ray
       return std::nullopt;
     }
-    auto v_ray_perp = v_ray_unit.Perpendicular();
 
     auto c1_proj = turtlelib::dot(v_a1, v_ray_perp);
     auto c2_proj = turtlelib::dot(v_a2, v_ray_perp);
     // don't know any better way for same sign check
-    if (c1_proj * c2_proj <0 ) {
+
+    if (c1_proj * c2_proj > 0) {
       // This is the case the entire line is off to one side of the ray
       return std::nullopt;
     }
 
     double c1_mag = std::abs(c1_proj);
     double c2_mag = std::abs(c2_proj);
-    auto x = (c1_mag * (b2_proj - b1_proj)) / (c1_mag + c2_mag);
-  return x + b1_proj;
-  }
 
+    auto x = (c1_mag * (b2_proj - b1_proj)) / (c1_mag + c2_mag);
+    auto intersect_mag = x + b1_proj;
+    RCLCPP_DEBUG_STREAM(get_logger(), "v ray " << v_ray_unit << " perp " << v_ray_perp);
+    RCLCPP_DEBUG_STREAM(get_logger(), "v_a1 " << v_a1 << " v_a2" << v_a2);
+    RCLCPP_DEBUG_STREAM(get_logger(), " b1_proj " << b1_proj << " b2_proj " << b2_proj);
+    RCLCPP_DEBUG_STREAM(get_logger(), " c1_proj " << c1_proj << " c2_proj " << c2_proj);
+    RCLCPP_DEBUG_STREAM(get_logger(), " c1_mag " << c1_mag << " c2_mag " << c2_mag);
+    RCLCPP_DEBUG_STREAM(get_logger(), "X: " << x);
+    RCLCPP_DEBUG_STREAM(get_logger(),
+                        "Hit at " << intersect_mag << " Vhit " << (intersect_mag)*v_ray_unit);
+    if (intersect_mag < 0) {
+      return std::nullopt;
+    }
+    return intersect_mag;
+  }
 
   //! @param ray_angle_body - angle of the ray in body frame.
   std::optional<double> ray_hitting(double ray_angle_body) {
@@ -558,16 +573,14 @@ private:
 
     if (! closest_intersect.has_value()){
       for ( const auto & wall_corner_pair : arena_corners){
+        RCLCPP_DEBUG_STREAM(get_logger() , "Wall "<< wall_corner_pair.first << wall_corner_pair.second );
+        auto maybe_length = ray_wall_check(v_ray_unit  ,wall_corner_pair, bot_config.translation().ToPoint() );
 
-      auto maybe_length = ray_wall_check(v_ray_unit  ,wall_corner_pair, bot_config.translation().ToPoint() );
-      if (maybe_length.has_value()){
-        closest_intersect = maybe_length.value();
-        break;
+        if (maybe_length.has_value()){
+          closest_intersect = maybe_length.value();
+          break;
+        }
       }
-
-      } 
-      
-
     }
     return closest_intersect;
   }
