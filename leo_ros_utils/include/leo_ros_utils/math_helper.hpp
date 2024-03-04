@@ -3,7 +3,6 @@
 
 #include <geometry_msgs/msg/pose.hpp>
 #include <turtlelib/se2d.hpp>
-#include <tf2/LinearMath/Quaternion.h>
 
 #include <geometry_msgs/msg/transform.hpp>
 
@@ -14,6 +13,7 @@ geometry_msgs::msg::Pose Convert(turtlelib::Transform2D trans2d);
 
 geometry_msgs::msg::Transform Convert( geometry_msgs::msg::Pose pose);
 
+turtlelib::Transform2D ConvertBack(geometry_msgs::msg::Pose pose);
 }
 
 #endif

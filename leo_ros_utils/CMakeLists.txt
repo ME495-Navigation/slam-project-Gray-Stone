@@ -11,6 +11,7 @@ find_package(turtlelib REQUIRED)
 
 find_package(rclcpp REQUIRED)
 find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
 # find_package(tf2_ros REQUIRED)
@@ -20,13 +21,14 @@ option(BUILD_DOCS "Build the documentation" OFF)
 # *************** BUILD  
 # Define the library
 add_library(leo_ros_utils src/math_helper.cpp)
+
 target_include_directories(
   leo_ros_utils
   PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
   $<INSTALL_INTERFACE:include/>)
   
   # Ros librarys
-  ament_target_dependencies(leo_ros_utils rclcpp geometry_msgs tf2)
+  ament_target_dependencies(leo_ros_utils rclcpp geometry_msgs tf2 tf2_ros)
   target_compile_features(leo_ros_utils PUBLIC cxx_std_17)
   # Turtlelib is not a ament target, thus included in this way.
   target_link_libraries(leo_ros_utils turtlelib::turtlelib)

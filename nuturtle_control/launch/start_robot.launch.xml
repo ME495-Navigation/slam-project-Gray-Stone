@@ -11,6 +11,7 @@
         none - Not launching any additional nodes" />
 
     <arg name="use_rviz" default="true" description="Enable using rviz" />
+    <arg name="use_odom" default="true" description="Enable odom node" />
 
 
     <!-- CMD input sutff -->
@@ -20,24 +21,27 @@
 
 
     <!-- Robot stuff -->
-    <node pkg="tf2_ros" exec="static_transform_publisher" name="world_odom_static_pub" 
-        args=" --frame-id nusim/world --child-frame-id odom"/>
+    <node pkg="tf2_ros" exec="static_transform_publisher" name="world_odom_static_pub" args=" --frame-id nusim/world --child-frame-id odom"/>
 
     <!-- The NuSim special. so special remap for them -->
     <group if="$(eval ' \'$(var robot)\' == \'nusim\' ')">
 
         <!-- Special rviz2 for sim -->
-        <node pkg="rviz2" exec="rviz2" 
-            args="-d $(find-pkg-share nuturtle_control)/config/simulation_run.rviz" 
-            if="$(eval '\'$(var use_rviz)\' ')">
+        <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share nuturtle_control)/config/simulation_run.rviz" if="$(eval '\'$(var use_rviz)\' ')">
         </node>
 
-        <!-- ODOM is reading from red, but publishing to blue robot -->
-        <node pkg="nuturtle_control" exec="odometry" output="screen">
-            <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
-            <param name="body_id" value="/blue/base_footprint"/>
-            <remap from="joint_states" to="red/joint_states"/>
-        </node>
+        <group if="$(eval ' \'$(var use_odom)\' ')">
+
+            <!-- ODOM is reading from red, but publishing to blue robot -->
+
+            <node pkg="nuturtle_control" exec="odometry" output="screen">
+                <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
+                <param name="body_id" value="/blue/base_footprint"/>
+                <remap from="joint_states" to="red/joint_states"/>
+            </node>
+
+            <node pkg="tf2_ros" exec="static_transform_publisher" name="world_odom_static_pub" args=" --frame-id nusim/world --child-frame-id odom"/>
+        </group>
 
         <!-- Control is controlling red robot. -->
         <node pkg="nuturtle_control" exec="turtle_control" output="screen">
@@ -49,10 +53,10 @@
         <node pkg="nusim" exec="nusim" output="screen">
             <param from="$(find-pkg-share nusim)/config/basic_world.yaml" />
             <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
-            <param name="input_noise"  value="0.0" />
-            <param name="slip_fraction"  value="0.0" />
-            <param name="max_range"  value="-1.0" />
-            <param name="basic_sensor_variance"  value="0.01" />
+            <param name="input_noise" value="0.0" />
+            <param name="slip_fraction" value="0.0" />
+            <param name="max_range" value="-1.0" />
+            <param name="basic_sensor_variance" value="0.01" />
 
             <remap from="red/sensor_data" to="sensor_data"/>
             <remap from="red/wheel_cmd" to="wheel_cmd"/>

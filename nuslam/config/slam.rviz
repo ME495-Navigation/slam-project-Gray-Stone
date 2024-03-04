@@ -6,11 +6,8 @@ Panels:
       Expanded:
         - /Global Options1
         - /TF1/Frames1
-        - /MarkerArray1/Topic1
-        - /MarkerArray2/Topic1
-        - /Path1
-        - /Path2
-        - /LaserScan1
+        - /obstacles_real1/Topic1
+        - /walls1/Topic1
       Splitter Ratio: 0.30957943201065063
     Tree Height: 608
   - Class: rviz_common/Selection
@@ -67,9 +64,27 @@ Visualization Manager:
           Value: true
         blue/imu_link:
           Value: true
+        blue/odom:
+          Value: true
         blue/wheel_left_link:
           Value: true
         blue/wheel_right_link:
+          Value: true
+        green/base_footprint:
+          Value: true
+        green/base_link:
+          Value: true
+        green/base_scan:
+          Value: true
+        green/caster_back_link:
+          Value: true
+        green/imu_link:
+          Value: true
+        green/odom:
+          Value: true
+        green/wheel_left_link:
+          Value: true
+        green/wheel_right_link:
           Value: true
         nusim/world:
           Value: true
@@ -96,7 +111,7 @@ Visualization Manager:
       Show Names: true
       Tree:
         nusim/world:
-          odom:
+          blue/odom:
             blue/base_footprint:
               blue/base_link:
                 blue/base_scan:
@@ -109,6 +124,21 @@ Visualization Manager:
                   {}
                 blue/wheel_right_link:
                   {}
+          green/odom:
+            green/base_footprint:
+              green/base_link:
+                green/base_scan:
+                  {}
+                green/caster_back_link:
+                  {}
+                green/imu_link:
+                  {}
+                green/wheel_left_link:
+                  {}
+                green/wheel_right_link:
+                  {}
+          odom:
+            {}
           red/base_footprint:
             red/base_link:
               red/base_scan:
@@ -241,9 +271,68 @@ Visualization Manager:
       Update Interval: 0
       Value: true
       Visual Enabled: true
+    - Alpha: 1
+      Class: rviz_default_plugins/RobotModel
+      Collision Enabled: false
+      Description File: ""
+      Description Source: Topic
+      Description Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /green/robot_description
+      Enabled: true
+      Links:
+        All Links Enabled: true
+        Expand Joint Details: false
+        Expand Link Details: false
+        Expand Tree: false
+        Link Tree Style: Links in Alphabetic Order
+        base_footprint:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        base_scan:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        caster_back_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        imu_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        wheel_left_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wheel_right_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+      Mass Properties:
+        Inertia: false
+        Mass: false
+      Name: green
+      TF Prefix: blue
+      Update Interval: 0
+      Value: true
+      Visual Enabled: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
-      Name: MarkerArray
+      Name: obstacles_real
       Namespaces:
         "": true
       Topic:
@@ -255,7 +344,7 @@ Visualization Manager:
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
-      Name: MarkerArray
+      Name: walls
       Namespaces:
         "": true
       Topic:
@@ -266,17 +355,17 @@ Visualization Manager:
         Value: /nusim/walls
       Value: true
     - Class: rviz_default_plugins/MarkerArray
-      Enabled: false
-      Name: MarkerArray
+      Enabled: true
+      Name: fake_sensor
       Namespaces:
-        {}
+        "": true
       Topic:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /fake_sensor
-      Value: false
+      Value: true
     - Alpha: 1
       Buffer Length: 150
       Class: rviz_default_plugins/Path
@@ -287,7 +376,7 @@ Visualization Manager:
       Length: 0.30000001192092896
       Line Style: Lines
       Line Width: 0.029999999329447746
-      Name: Path
+      Name: red_path
       Offset:
         X: 0
         Y: 0
@@ -315,7 +404,7 @@ Visualization Manager:
       Length: 0.30000001192092896
       Line Style: Lines
       Line Width: 0.029999999329447746
-      Name: Path
+      Name: blue_path
       Offset:
         X: 0
         Y: 0
@@ -334,10 +423,38 @@ Visualization Manager:
         Value: /blue/path
       Value: true
     - Alpha: 1
+      Buffer Length: 150
+      Class: rviz_default_plugins/Path
+      Color: 1; 1; 255
+      Enabled: true
+      Head Diameter: 0.30000001192092896
+      Head Length: 0.20000000298023224
+      Length: 0.30000001192092896
+      Line Style: Lines
+      Line Width: 0.029999999329447746
+      Name: green_path
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
+      Pose Style: None
+      Radius: 0.029999999329447746
+      Shaft Diameter: 0.10000000149011612
+      Shaft Length: 0.10000000149011612
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /green/path
+      Value: true
+    - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 2.5001866817474365
-        Min Value: -2.5000925064086914
+        Max Value: 2.500136375427246
+        Min Value: -2.5000691413879395
         Value: true
       Axis: X
       Channel Name: intensity
@@ -413,25 +530,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 5.6177520751953125
+      Distance: 3.7469892501831055
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.7369050979614258
-        Y: 0.4873747229576111
-        Z: 0.10301470756530762
+        X: -0.3377644717693329
+        Y: 0.13751623034477234
+        Z: 0.3074270188808441
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.0395469665527344
+      Pitch: 1.0895473957061768
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz_default_plugins)
-      Yaw: 3.112074851989746
+      Yaw: 3.1320745944976807
     Saved: ~
 Window Geometry:
   Displays:

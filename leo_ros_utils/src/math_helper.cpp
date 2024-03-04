@@ -1,7 +1,6 @@
 #include "leo_ros_utils/math_helper.hpp"
-
-
-
+#include <tf2/tf2/utils.h>
+#include <tf2/LinearMath/Quaternion.h>
 
 namespace leo_ros_utils {
 
@@ -22,16 +21,28 @@ geometry_msgs::msg::Pose Convert(turtlelib::Transform2D trans2d) {
     return pose;
 }
 
+turtlelib::Transform2D ConvertBack(geometry_msgs::msg::Pose pose) {
+  double roll;
+  double yaw;
+  double pitch;
 
-geometry_msgs::msg::Transform Convert( geometry_msgs::msg::Pose pose){
-
-geometry_msgs::msg::Transform tf;
-tf.translation.x = pose.position.x;
-tf.translation.y = pose.position.y;
-tf.translation.z = pose.position.z;
-
-tf.rotation = pose.orientation;
-
-return tf;
+  // The fromMsg for quaternion can't be find by linker. 
+  tf2::getEulerYPR(tf2::Quaternion(pose.orientation.x, pose.orientation.y, pose.orientation.z,
+                                   pose.orientation.w),
+                   yaw, pitch, roll);
+  return turtlelib::Transform2D{{pose.position.x, pose.position.y}, pitch};
 }
+
+  geometry_msgs::msg::Transform
+  Convert(geometry_msgs::msg::Pose pose) {
+
+    geometry_msgs::msg::Transform tf;
+    tf.translation.x = pose.position.x;
+    tf.translation.y = pose.position.y;
+    tf.translation.z = pose.position.z;
+
+    tf.rotation = pose.orientation;
+
+    return tf;
+  }
 }

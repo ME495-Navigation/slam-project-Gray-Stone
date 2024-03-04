@@ -2,7 +2,7 @@
 //! @brief Generate odometry base on wheel encoder change
 // Parameters:
 //  body_id - string: name of the body frame
-//  odom_id - string: name of the body frame
+//  odom_id - string: name of the odom frame
 //  wheel_left - string: name of left wheel joint
 //  wheel_right - string: name of right wheel joint
 //  wheel_radius - double: wheel radius
@@ -143,9 +143,22 @@ public:
     last_stamped_tf2d = std::pair{current_time, bot_tf};
 
     // Publish the track
+    // Rviz behavior: 
+    // The newly published track is honored with the header's frame.
+    // IF turn on the history caching, aka let Rviz generate the long tail, just publish 
+    // a single dot here. Then rivz will remember the cache with global position. 
+    // This mean if the frame of the path jumped, the current published path will jump with it, 
+    // but the previously published, cached by rivz, path will stay in place. 
+    // So could just publish a 0 0 0 with robot frame, and let rviz figure it out.
+
+    // I have tried to publish with frame_id = body_id, then just all zero in pose. The problem
+    // is  the path will be too short, so it'll be visually very hard to see, but if I give 2 segments
+    // 0.01 offset in x, it will work. So it's best to still publish in odom frame with actual value
+    // for a few cycle, but then let rviz figure out the longer duration cache.
 
     geometry_msgs::msg::PoseStamped new_pose;
     new_pose.pose = odom_msg.pose.pose;
+    new_pose.pose.orientation = odom_msg.pose.pose.orientation;
     new_pose.header.frame_id = odom_id;
     new_pose.header.stamp = get_clock()->now();
 
@@ -153,10 +166,13 @@ public:
     if (odom_path_history.size() >= kRobotPathHistorySize) {
       odom_path_history.pop_front();
     }
+
+    
     nav_msgs::msg::Path path_msg;
     path_msg.header = new_pose.header;
     path_msg.poses = std::vector<geometry_msgs::msg::PoseStamped>{odom_path_history.begin(),
                                                                   odom_path_history.end()};
+
     path_publisher_->publish(path_msg);
   }
 
@@ -167,7 +183,7 @@ public:
   }
 
 private:
-  constexpr static size_t kRobotPathHistorySize = 400; // number of data points
+  constexpr static size_t kRobotPathHistorySize = 10; // number of data points
 
   std::string body_id;
   std::string odom_id;

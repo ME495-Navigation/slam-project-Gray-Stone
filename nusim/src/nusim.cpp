@@ -738,7 +738,7 @@ private:
 
   constexpr static int32_t kStaticObstacleStartingID = 10;
   constexpr static int32_t kFakeSenorStartingID = 150;
-  constexpr static size_t kRobotPathHistorySize = 400 ; // number of data points
+  constexpr static size_t kRobotPathHistorySize = 10 ; // number of data points
 
   // Ros Params
   const std::chrono::nanoseconds update_period; // period for each cycle of update
