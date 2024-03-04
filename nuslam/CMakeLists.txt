@@ -20,11 +20,18 @@ find_package(visualization_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(Armadillo REQUIRED)
 find_package(Doxygen)
 option(BUILD_DOCS "Build the documentation" OFF)
 
 
 add_executable(slam src/slam.cpp)
+
+target_include_directories(slam
+PUBLIC 
+${ARMADILLO_INCLUDE_DIRS}
+)
+
 ament_target_dependencies(
   slam
   rclcpp
@@ -37,11 +44,12 @@ ament_target_dependencies(
   visualization_msgs
   tf2
   leo_ros_utils)
-target_link_libraries(slam turtlelib::turtlelib)
+target_link_libraries(slam turtlelib::turtlelib ${ARMADILLO_LIBRARIES})
 
 install(TARGETS slam DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
+
 
 
 if(BUILD_TESTING)

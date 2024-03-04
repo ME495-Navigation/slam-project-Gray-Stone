@@ -49,11 +49,38 @@
 #include <leo_ros_utils/math_helper.hpp>
 #include <leo_ros_utils/param_helper.hpp>
 
+#include <armadillo>
+
 using leo_ros_utils::GetParam;
 
 namespace  {
 
+// These are copied from nusim.
 const std::string kWorldFrame = "nusim/world";
+constexpr static int32_t kFakeSenorStartingID = 150;
+
+constexpr size_t kMaxLandmarkSize = 3;
+constexpr size_t kTotalStateSize = 3 + kMaxLandmarkSize * 2;
+
+
+constexpr double kProcessNoise = 0.001;
+
+arma::mat GetQMat() {
+  arma::mat q_mat = arma::zeros(kTotalStateSize,kTotalStateSize);
+  q_mat.at(0, 0) = kProcessNoise;
+  q_mat.at(1, 1) = kProcessNoise;
+  q_mat.at(2, 2) = kProcessNoise;
+  return q_mat;
+}
+
+arma::mat GetSigmaZero() {
+
+  arma::mat seg_0 = arma::zeros(kTotalStateSize,kTotalStateSize);
+
+  seg_0.submat(3, 3, kTotalStateSize -1 , kTotalStateSize -1) =
+      arma::eye(kMaxLandmarkSize * 2, kMaxLandmarkSize * 2) * (std::numeric_limits<double>::max() / 10);
+  return seg_0;
+}
 }
 
 class Slam : public rclcpp::Node {
@@ -62,6 +89,11 @@ public:
       : Node("odometry"),
         body_id(GetParam<std::string>(*this, "body_id", "name of the body frame")),
         odom_id(GetParam<std::string>(*this, "odom_id", "name of the body frame")),
+        covariance_sigma(GetSigmaZero()),
+        combined_states(arma::zeros(3+kMaxLandmarkSize*2,1)),
+        // We do pre sensor update, so R_mat is only 2x2 
+        R_mat(arma::eye(2,2) * 0.000000001),
+        initialized_landmark(kMaxLandmarkSize , false),
         tf_broadcaster(*this)
         {
     // Uncomment this to turn on debug level and enable debug statements
@@ -83,58 +115,151 @@ public:
         "/fake_sensor", 10, std::bind(&Slam::SensorCb, this, std::placeholders::_1));
   }
 
-  void JointStateCb(const sensor_msgs::msg::JointState &msg) {
-    std::stringstream debug_ss;
-    debug_ss << "\n===>\n";
-
-    // // Publish the tf stamped.
-    // geometry_msgs::msg::TransformStamped tf_stamped;
-    // tf_stamped.header.frame_id = odom_id;
-    // tf_stamped.child_frame_id = body_id;
-    // tf_stamped.header.stamp = msg.header.stamp;
-    // tf_stamped.transform = leo_ros_utils::Convert(odom_msg.pose.pose);
-
-    // tf_broadcaster.sendTransform(tf_stamped);
-    // last_stamped_tf2d = std::pair{current_time, bot_tf};
-
-    // // Publish the track
-
-    // geometry_msgs::msg::PoseStamped new_pose;
-    // new_pose.pose = odom_msg.pose.pose;
-    // new_pose.header.frame_id = odom_id;
-    // new_pose.header.stamp = get_clock()->now();
-
-    // odom_path_history.push_back(new_pose);
-    // if (odom_path_history.size() >= kRobotPathHistorySize) {
-    //   odom_path_history.pop_front();
-    // }
-    // nav_msgs::msg::Path path_msg;
-    // path_msg.header = new_pose.header;
-    // path_msg.poses = std::vector<geometry_msgs::msg::PoseStamped>{odom_path_history.begin(),
-    //                                                               odom_path_history.end()};
-    // path_publisher_->publish(path_msg);
-  }
-
   void OdomCb(const nav_msgs::msg::Odometry &msg) { new_odom = msg; }
 
   void SensorCb(const visualization_msgs::msg::MarkerArray& msg ){
 
     // Static last_used_odom,
-    static turtlelib::Transform2D T_world_old_odom;
+    static turtlelib::Transform2D T_odom_oldrobot;
     // update slam's robot pose guess with the delta in odom (odom is accurate with delta)
-    turtlelib::Transform2D  T_world_new_odom = leo_ros_utils::ConvertBack(new_odom.pose.pose);
+    turtlelib::Transform2D  T_odom_newrobot = leo_ros_utils::ConvertBack(new_odom.pose.pose);
+    // Want T_old_new = T_old_odom * T_odom_new = T_odom_old.inv() * T_odom_new
+    turtlelib::Transform2D T_old_new_robot = T_odom_oldrobot.inv() * T_odom_newrobot;
 
-    // Want T_old_new = T_old_world * T_world_new = T_world_old.inv() * T_world_new
-    turtlelib::Transform2D T_old_new_odom = T_world_old_odom.inv() * T_world_new_odom;
+    RCLCPP_ERROR_STREAM(get_logger() , "\n\n=====================New Cycle");
+    //***************************************
+    // Prediction half of SLAM
 
-    // Apply this delta onto the slam guess
-    guessed_robot_world *= T_old_new_odom;
+    // Predict state
+     turtlelib::Transform2D guessed_robot_world =
+         GetCurrentStateTF(combined_states) * T_old_new_robot;
+     combined_states.at(0) = guessed_robot_world.translation().x;
+     combined_states.at(1) = guessed_robot_world.translation().y;
+     combined_states.at(2) = guessed_robot_world.rotation();
+
+     auto current_bot_tf = GetCurrentStateTF(combined_states);
+     // predict A matrix
+     arma::mat a_mat = arma::eye(kTotalStateSize, kTotalStateSize);
+     a_mat.at(1, 0) = -T_old_new_robot.translation().y;
+     a_mat.at(2, 0) = T_old_new_robot.translation().x;
+
+     covariance_sigma = a_mat * covariance_sigma * a_mat.t() + GetQMat();
+    RCLCPP_ERROR_STREAM(get_logger(),"predicted bot tf\n "<<current_bot_tf);
+    RCLCPP_ERROR_STREAM(get_logger(),"a_mat\n "<<a_mat);
+    RCLCPP_ERROR_STREAM(get_logger(),"covariance sigma\n "<<covariance_sigma);
+
+     //***************************************
+     // Measurement update half of SLAM
 
 
+     for (const auto &marker : msg.markers) {
+       // Note: This XY still needs a transform, it's in robot's frame,
+       // But the math we use needs it in global frame's delta xy.
+       // They are a rotation off.
 
-    T_world_old_odom = T_world_new_odom;
-    PublishWorldOdomRobot(guessed_robot_world, T_world_new_odom, new_odom.header.stamp);
+      // Data formatting
+      auto [marker_world_p, marker_index] = StripMarker(marker, current_bot_tf);
+
+      RCLCPP_INFO_STREAM(get_logger(),
+                         "Processing Marker " << marker_index << " At world: " << marker_world_p);
+
+      // Init with trusting the sensor value.
+      if (! initialized_landmark[marker_index]){
+        combined_states.at(3+marker_index*2) = marker_world_p.x;
+        combined_states.at(3+marker_index*2+1) = marker_world_p.x;
+        initialized_landmark[marker_index] = true;
+        RCLCPP_INFO_STREAM(get_logger(), "Marker " << marker_index << " Init for the first time");
+      }
+
+      // Get predict and measured marker to robot xy
+      RCLCPP_ERROR_STREAM(get_logger(), "Combined state\n" << combined_states);
+      auto predict_landmark_delta =
+          GetDeltaXY(turtlelib::Point2D{combined_states.at(3 + marker_index * 2),
+                                        combined_states.at(3 + marker_index * 2 + 1)},
+                     current_bot_tf.translation());
+      RCLCPP_ERROR_STREAM(get_logger(), "Predicted Marker delta " << predict_landmark_delta);
+      auto H_j_mat = GetH_j(marker_index, predict_landmark_delta);
+
+      arma::mat K_j_mat = covariance_sigma * H_j_mat.t() *
+                          arma::inv(H_j_mat * covariance_sigma * H_j_mat.t() + R_mat);
+
+      RCLCPP_ERROR_STREAM(get_logger(), "H_j " << H_j_mat);
+      RCLCPP_ERROR_STREAM(get_logger(), "K_j " << K_j_mat);
+
+      auto measured_landmark_delta = GetDeltaXY(marker_world_p, current_bot_tf.translation());
+
+      RCLCPP_ERROR_STREAM(get_logger(), "measured_landmark_delta " << measured_landmark_delta);
+
+      RCLCPP_ERROR_STREAM(get_logger(), "K_j * err \n" << K_j_mat * ((Point2Col(measured_landmark_delta)) -
+                                                     (Point2Col(predict_landmark_delta))));
+                                                     
+      combined_states = combined_states + K_j_mat * ((Point2Col(measured_landmark_delta)) -
+                                                     (Point2Col(predict_landmark_delta)));
+      RCLCPP_ERROR_STREAM(get_logger(), "Combined state\n" << combined_states);
+
+      covariance_sigma =
+          (arma::eye(kTotalStateSize, kTotalStateSize) - K_j_mat * H_j_mat) * covariance_sigma;
+      RCLCPP_ERROR_STREAM(get_logger(), "covariance sigma\n " << covariance_sigma);
+     }
+
+
+    T_odom_oldrobot = T_odom_newrobot;
+
+    turtlelib::Transform2D new_robot_world{{combined_states.at(0), combined_states.at(1)},
+                                           combined_states.at(2)};
+
+    PublishWorldOdomRobot(new_robot_world, T_odom_newrobot, new_odom.header.stamp);
   }
+
+
+  // void Predict(turtlelib::Transform2D T_delta){
+    
+  // }
+
+
+  // This gives a delta x delta y from robot to landmark
+  turtlelib::Point2D GetDeltaXY(turtlelib::Point2D landmark_world_xy , turtlelib::Vector2D bot_xy){
+    auto[landmark_x, landmark_y] = landmark_world_xy;
+    return {landmark_x - bot_xy.x, landmark_y - bot_xy.y};
+  }
+
+  // landmark_index is zero indexed 
+  //! @brief - Get the big H_j matrix for landmark J, given it's relative location from robot 
+  //! @param landmark_index - index of the landmark, zero indexed (max n-1 for n landmarks)
+  //! @param landmark_robot_xy- relative location of landmark relative to robot
+  arma::mat GetH_j(size_t landmark_index ,turtlelib::Point2D landmark_robot_xy ){
+    auto [dx,dy] = landmark_robot_xy;
+    double d = dx*dx +dy*dy;
+    double d_rt = std::sqrt(d);
+    arma::mat first({
+      {0 , -dx/d_rt , -dy/d_rt},
+      {-1, dy/d , -dx/d}
+    });
+
+    arma::mat second({
+      {dx/d_rt , dy/d_rt},
+      {-dy/d , dx/d}
+    });
+
+    return arma::join_rows(first, arma::zeros(2, 2 * (landmark_index)), second,
+                           arma::zeros(2, 2 * (kMaxLandmarkSize - 1 - landmark_index)));
+  }
+
+  // #############################
+  // Data type Helpers 
+  // #############################
+
+  turtlelib::Transform2D GetCurrentStateTF(arma::mat current_state){
+    return {{current_state.at(0), current_state.at(1)}, current_state.at(2)};
+  }
+
+  //! @brief return stripped marker info
+  //! @return tuple of : Marker's location in world, and Marker's id. 
+  std::tuple<turtlelib::Point2D , size_t> StripMarker( visualization_msgs::msg::Marker marker , turtlelib::Transform2D bot_pose){
+    return {bot_pose(turtlelib::Point2D{marker.pose.position.x, marker.pose.position.y}) , marker.id - kFakeSenorStartingID };
+  }
+
+  arma::mat Point2Col(turtlelib::Point2D xy) { return arma::Col<double>{xy.x, xy.y}; }
 
   void PublishWorldOdomRobot(turtlelib::Transform2D T_world_robot,
                              turtlelib::Transform2D T_odom_robot,
@@ -156,16 +281,13 @@ public:
     geometry_msgs::msg::PoseStamped new_pose;
     new_pose.header.frame_id = body_id;
     new_pose.header.stamp = stamp;
-    
-
     nav_msgs::msg::Path path_msg;
     path_msg.header = new_pose.header;
-
+    path_msg.poses.push_back(new_pose);
     new_pose.pose.position.x += 0.005;
+    path_msg.poses.push_back(new_pose);
 
     path_publisher_->publish(path_msg);
-
-
   }
 
 private:
@@ -176,6 +298,11 @@ private:
 
   turtlelib::Transform2D guessed_robot_world;
 
+  // combined covariance segma_t
+  arma::mat covariance_sigma;
+  arma::mat combined_states;
+  arma::mat R_mat;
+  std::vector<bool> initialized_landmark;
   // ROS IDL stuff
   tf2_ros::TransformBroadcaster tf_broadcaster;
   std::pair<double, turtlelib::Transform2D> last_stamped_tf2d;

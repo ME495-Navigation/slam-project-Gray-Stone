@@ -30,7 +30,8 @@ turtlelib::Transform2D ConvertBack(geometry_msgs::msg::Pose pose) {
   tf2::getEulerYPR(tf2::Quaternion(pose.orientation.x, pose.orientation.y, pose.orientation.z,
                                    pose.orientation.w),
                    yaw, pitch, roll);
-  return turtlelib::Transform2D{{pose.position.x, pose.position.y}, pitch};
+
+  return turtlelib::Transform2D{{pose.position.x, pose.position.y}, yaw};
 }
 
   geometry_msgs::msg::Transform
