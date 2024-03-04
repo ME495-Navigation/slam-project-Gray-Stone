@@ -62,7 +62,7 @@ constexpr size_t kMaxLandmarkSize = 3;
 constexpr size_t kTotalStateSize = 3 + kMaxLandmarkSize * 2;
 
 constexpr double kProcessNoise = 1e-9;
-constexpr double kSensorNoise = 1e-8;
+constexpr double kSensorNoise = 1e-9;
 
 arma::mat GetQMat() {
   arma::mat q_mat = arma::zeros(kTotalStateSize, kTotalStateSize);
@@ -80,7 +80,7 @@ arma::mat GetSigmaZero() {
       arma::eye(kMaxLandmarkSize * 2, kMaxLandmarkSize * 2) * large_number;
   return seg_0;
 }
-}
+} // namespace
 
 class Slam : public rclcpp::Node {
 public:
@@ -198,7 +198,7 @@ public:
       auto measured_landmark_polar = World2RelativePolar(marker_world_p, current_bot_tf);
       RCLCPP_ERROR_STREAM(get_logger(), "measured_landmark_delta " << measured_landmark_delta);
       RCLCPP_ERROR_STREAM(get_logger(),
-                          "measured_landmark_polar " << Struct2Col(predict_landmark_polar));
+                          "measured_landmark_polar " << Struct2Col(measured_landmark_polar));
 
       arma::Col<double> err =
           (Struct2Col(measured_landmark_polar)) - (Struct2Col(predict_landmark_polar));
@@ -227,152 +227,151 @@ public:
                                            combined_states.at(2)};
 
     PublishWorldOdomRobot(new_robot_world, T_odom_newrobot, new_odom.header.stamp);
-
-    // This gives a delta x delta y from robot to landmark
-    turtlelib::Point2D GetDeltaXY(turtlelib::Point2D landmark_world_xy,
-                                  turtlelib::Vector2D bot_xy) {
-      auto [landmark_x, landmark_y] = landmark_world_xy;
-      return {landmark_x - bot_xy.x, landmark_y - bot_xy.y};
-    }
-
-    std::tuple<double, double> World2RelativePolar(turtlelib::Point2D landmark_world_xy,
-                                                   turtlelib::Transform2D bot_pose) {
-      auto [dx, dy] = GetDeltaXY(landmark_world_xy, bot_pose.translation());
-      double range = std::sqrt(dx * dx + dy * dy);
-      double bearing = turtlelib::normalize_angle(atan2(dy, dx) - bot_pose.rotation());
-      return {range, bearing};
-    }
-
-    // landmark_index is zero indexed
-    //! @brief - Get the big H_j matrix for landmark J, given it's relative location from robot
-    //! @param landmark_index - index of the landmark, zero indexed (max n-1 for n landmarks)
-    //! @param landmark_robot_xy- relative location of landmark relative to robot
-    arma::mat GetH_j(size_t landmark_index, turtlelib::Point2D landmark_robot_xy) {
-      auto [dx, dy] = landmark_robot_xy;
-      double d = dx * dx + dy * dy;
-      double d_rt = std::sqrt(d);
-      arma::mat first({{0, -dx / d_rt, -dy / d_rt}, {-1, dy / d, -dx / d}});
-
-      arma::mat second({{dx / d_rt, dy / d_rt}, {-dy / d, dx / d}});
-
-      return arma::join_rows(first, arma::zeros(2, 2 * (landmark_index)), second,
-                             arma::zeros(2, 2 * (kMaxLandmarkSize - 1 - landmark_index)));
-    }
-
-    // #############################
-    // Data type Helpers
-    // #############################
-
-    turtlelib::Transform2D GetCurrentStateTF(arma::mat current_state) {
-      return {{current_state.at(0), current_state.at(1)}, current_state.at(2)};
-    }
-
-    //! @brief return stripped marker info
-    //! @return tuple of : Marker's location in world, and Marker's id.
-    std::tuple<turtlelib::Point2D, size_t> StripMarker(visualization_msgs::msg::Marker marker,
-                                                       turtlelib::Transform2D bot_pose) {
-      return {bot_pose(turtlelib::Point2D{marker.pose.position.x, marker.pose.position.y}),
-              marker.id - kFakeSenorStartingID};
-    }
-
-    template <typename S> arma::mat Struct2Col(S xy) {
-      auto [x, y] = xy;
-      return arma::Col<double>{x, y};
-    }
-
-    void PublishWorldOdomRobot(turtlelib::Transform2D T_world_robot,
-                               turtlelib::Transform2D T_odom_robot,
-                               builtin_interfaces::msg::Time stamp) {
-      auto T_world_odom = T_world_robot * (T_odom_robot.inv());
-
-      geometry_msgs::msg::TransformStamped tf_stamped;
-      tf_stamped.header.frame_id = odom_id;
-      tf_stamped.child_frame_id = body_id;
-      tf_stamped.header.stamp = stamp;
-      tf_stamped.transform = leo_ros_utils::Convert(leo_ros_utils::Convert(T_odom_robot));
-      tf_broadcaster.sendTransform(tf_stamped);
-
-      tf_stamped.header.frame_id = kWorldFrame;
-      tf_stamped.child_frame_id = odom_id;
-      tf_stamped.transform = leo_ros_utils::Convert(leo_ros_utils::Convert(T_world_odom));
-      tf_broadcaster.sendTransform(tf_stamped);
-
-      geometry_msgs::msg::PoseStamped new_pose;
-      new_pose.header.frame_id = kWorldFrame;
-      new_pose.header.stamp = stamp;
-      new_pose.pose.position.x = T_world_robot.translation().x;
-      new_pose.pose.position.y = T_world_robot.translation().y;
-      bot_path_history.push_back(new_pose);
-      if (bot_path_history.size() >= kRobotPathHistorySize) {
-        bot_path_history.pop_front();
-      }
-
-      nav_msgs::msg::Path path_msg;
-      path_msg.header = new_pose.header;
-
-      path_msg.poses = std::vector<geometry_msgs::msg::PoseStamped>{bot_path_history.begin(),
-                                                                    bot_path_history.end()};
-
-      path_publisher_->publish(path_msg);
-    }
-
-    void PublishObsLocation(turtlelib::Point2D loc, size_t LandmarkIndex, std::string frame_name) {
-      visualization_msgs::msg::MarkerArray msg;
-      visualization_msgs::msg::Marker mk;
-      mk.header.frame_id = frame_name;
-      mk.header.stamp = get_clock()->now();
-      mk.id = kSlamMarkerStartingID + LandmarkIndex;
-
-      RCLCPP_ERROR_STREAM(get_logger(), "Publishing loc " << loc);
-      mk.pose.position.x = loc.x;
-      mk.pose.position.y = loc.y;
-      mk.scale.z = 0.8;
-      mk.pose.position.z = 0.8 / 2;
-      mk.color.g = 1.0;
-      mk.color.a = 0.8;
-
-      mk.type = mk.CYLINDER;
-      mk.scale.x = 0.035 * 2;
-      mk.scale.y = 0.035 * 2;
-      msg.markers.push_back(mk);
-      sensor_estimate_pub_->publish(msg);
-    }
-
-  private:
-    std::string body_id;
-    std::string odom_id;
-
-    nav_msgs::msg::Odometry new_odom;
-
-    std::deque<geometry_msgs::msg::PoseStamped> bot_path_history =
-        std::deque<geometry_msgs::msg::PoseStamped>(kRobotPathHistorySize);
-
-    // turtlelib::Transform2D guessed_robot_world;
-
-    // combined covariance segma_t
-    arma::mat covariance_sigma;
-    arma::mat combined_states;
-    arma::mat R_mat;
-    std::vector<bool> initialized_landmark;
-    // ROS IDL stuff
-    tf2_ros::TransformBroadcaster tf_broadcaster;
-    std::pair<double, turtlelib::Transform2D> last_stamped_tf2d;
-
-    rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_publisher_;
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr sensor_estimate_pub_;
-    std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
-
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
-    rclcpp::Subscription<visualization_msgs::msg::MarkerArray>::SharedPtr fake_sensor_sub_;
-  };
-
-  int main(int argc, char *argv[]) {
-    rclcpp::init(argc, argv);
-
-    //   rclcpp::Node::SharedPtr node_ptr =
-    //   std::make_shared<rclcpp::Node>("turtle_control") ; TurtleControl
-    //   t_ctrl{node_ptr};
-    rclcpp::spin(std::make_shared<Slam>());
-    rclcpp::shutdown();
-    return 0;
   }
+  // This gives a delta x delta y from robot to landmark
+  turtlelib::Point2D GetDeltaXY(turtlelib::Point2D landmark_world_xy, turtlelib::Vector2D bot_xy) {
+    auto [landmark_x, landmark_y] = landmark_world_xy;
+    return {landmark_x - bot_xy.x, landmark_y - bot_xy.y};
+  }
+
+  std::tuple<double, double> World2RelativePolar(turtlelib::Point2D landmark_world_xy,
+                                                 turtlelib::Transform2D bot_pose) {
+    auto [dx, dy] = GetDeltaXY(landmark_world_xy, bot_pose.translation());
+    double range = std::sqrt(dx * dx + dy * dy);
+    double bearing = turtlelib::normalize_angle(atan2(dy, dx) - bot_pose.rotation());
+    return {range, bearing};
+  }
+
+  // landmark_index is zero indexed
+  //! @brief - Get the big H_j matrix for landmark J, given it's relative location from robot
+  //! @param landmark_index - index of the landmark, zero indexed (max n-1 for n landmarks)
+  //! @param landmark_robot_xy- relative location of landmark relative to robot
+  arma::mat GetH_j(size_t landmark_index, turtlelib::Point2D landmark_robot_xy) {
+    auto [dx, dy] = landmark_robot_xy;
+    double d = dx * dx + dy * dy;
+    double d_rt = std::sqrt(d);
+    arma::mat first({{0, -dx / d_rt, -dy / d_rt}, {-1, dy / d, -dx / d}});
+
+    arma::mat second({{dx / d_rt, dy / d_rt}, {-dy / d, dx / d}});
+
+    return arma::join_rows(first, arma::zeros(2, 2 * (landmark_index)), second,
+                           arma::zeros(2, 2 * (kMaxLandmarkSize - 1 - landmark_index)));
+  }
+
+  // #############################
+  // Data type Helpers
+  // #############################
+
+  turtlelib::Transform2D GetCurrentStateTF(arma::mat current_state) {
+    return {{current_state.at(0), current_state.at(1)}, current_state.at(2)};
+  }
+
+  //! @brief return stripped marker info
+  //! @return tuple of : Marker's location in world, and Marker's id.
+  std::tuple<turtlelib::Point2D, size_t> StripMarker(visualization_msgs::msg::Marker marker,
+                                                     turtlelib::Transform2D bot_pose) {
+    return {bot_pose(turtlelib::Point2D{marker.pose.position.x, marker.pose.position.y}),
+            marker.id - kFakeSenorStartingID};
+  }
+
+  template <typename S> arma::mat Struct2Col(S xy) {
+    auto [x, y] = xy;
+    return arma::Col<double>{x, y};
+  }
+
+  void PublishWorldOdomRobot(turtlelib::Transform2D T_world_robot,
+                             turtlelib::Transform2D T_odom_robot,
+                             builtin_interfaces::msg::Time stamp) {
+    auto T_world_odom = T_world_robot * (T_odom_robot.inv());
+
+    geometry_msgs::msg::TransformStamped tf_stamped;
+    tf_stamped.header.frame_id = odom_id;
+    tf_stamped.child_frame_id = body_id;
+    tf_stamped.header.stamp = stamp;
+    tf_stamped.transform = leo_ros_utils::Convert(leo_ros_utils::Convert(T_odom_robot));
+    tf_broadcaster.sendTransform(tf_stamped);
+
+    tf_stamped.header.frame_id = kWorldFrame;
+    tf_stamped.child_frame_id = odom_id;
+    tf_stamped.transform = leo_ros_utils::Convert(leo_ros_utils::Convert(T_world_odom));
+    tf_broadcaster.sendTransform(tf_stamped);
+
+    geometry_msgs::msg::PoseStamped new_pose;
+    new_pose.header.frame_id = kWorldFrame;
+    new_pose.header.stamp = stamp;
+    new_pose.pose.position.x = T_world_robot.translation().x;
+    new_pose.pose.position.y = T_world_robot.translation().y;
+    bot_path_history.push_back(new_pose);
+    if (bot_path_history.size() >= kRobotPathHistorySize) {
+      bot_path_history.pop_front();
+    }
+
+    nav_msgs::msg::Path path_msg;
+    path_msg.header = new_pose.header;
+
+    path_msg.poses = std::vector<geometry_msgs::msg::PoseStamped>{bot_path_history.begin(),
+                                                                  bot_path_history.end()};
+
+    path_publisher_->publish(path_msg);
+  }
+
+  void PublishObsLocation(turtlelib::Point2D loc, size_t LandmarkIndex, std::string frame_name) {
+    visualization_msgs::msg::MarkerArray msg;
+    visualization_msgs::msg::Marker mk;
+    mk.header.frame_id = frame_name;
+    mk.header.stamp = get_clock()->now();
+    mk.id = kSlamMarkerStartingID + LandmarkIndex;
+
+    RCLCPP_ERROR_STREAM(get_logger(), "Publishing loc " << loc);
+    mk.pose.position.x = loc.x;
+    mk.pose.position.y = loc.y;
+    mk.scale.z = 0.8;
+    mk.pose.position.z = 0.8 / 2;
+    mk.color.g = 1.0;
+    mk.color.a = 0.8;
+
+    mk.type = mk.CYLINDER;
+    mk.scale.x = 0.035 * 2;
+    mk.scale.y = 0.035 * 2;
+    msg.markers.push_back(mk);
+    sensor_estimate_pub_->publish(msg);
+  }
+
+private:
+  std::string body_id;
+  std::string odom_id;
+
+  nav_msgs::msg::Odometry new_odom;
+
+  std::deque<geometry_msgs::msg::PoseStamped> bot_path_history =
+      std::deque<geometry_msgs::msg::PoseStamped>(kRobotPathHistorySize);
+
+  // turtlelib::Transform2D guessed_robot_world;
+
+  // combined covariance segma_t
+  arma::mat covariance_sigma;
+  arma::mat combined_states;
+  arma::mat R_mat;
+  std::vector<bool> initialized_landmark;
+  // ROS IDL stuff
+  tf2_ros::TransformBroadcaster tf_broadcaster;
+  std::pair<double, turtlelib::Transform2D> last_stamped_tf2d;
+
+  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_publisher_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr sensor_estimate_pub_;
+  std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+  rclcpp::Subscription<visualization_msgs::msg::MarkerArray>::SharedPtr fake_sensor_sub_;
+};
+
+int main(int argc, char *argv[]) {
+  rclcpp::init(argc, argv);
+
+  //   rclcpp::Node::SharedPtr node_ptr =
+  //   std::make_shared<rclcpp::Node>("turtle_control") ; TurtleControl
+  //   t_ctrl{node_ptr};
+  rclcpp::spin(std::make_shared<Slam>());
+  rclcpp::shutdown();
+  return 0;
+}
