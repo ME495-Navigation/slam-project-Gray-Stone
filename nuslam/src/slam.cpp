@@ -26,7 +26,7 @@
 #include <nav_msgs/msg/path.hpp>
 #include <nuturtlebot_msgs/msg/sensor_data.hpp>
 #include <nuturtlebot_msgs/msg/wheel_commands.hpp>
-#include <optional>
+#include <deque>
 #include <rclcpp/exceptions/exceptions.hpp>
 #include <rclcpp/logger.hpp>
 #include <rclcpp/logging.hpp>
@@ -37,7 +37,6 @@
 #include <rclcpp/time.hpp>
 #include <sensor_msgs/msg/detail/joint_state__traits.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
-#include <sstream>
 #include <string>
 #include <tf2_ros/transform_broadcaster.h>
 #include <turtlelib/diff_drive.hpp>
@@ -58,12 +57,13 @@ namespace  {
 // These are copied from nusim.
 const std::string kWorldFrame = "nusim/world";
 constexpr static int32_t kFakeSenorStartingID = 150;
+constexpr static int32_t kSlamMarkerStartingID = 300;
+constexpr static size_t kRobotPathHistorySize = 10 ; // number of data points
 
 constexpr size_t kMaxLandmarkSize = 3;
 constexpr size_t kTotalStateSize = 3 + kMaxLandmarkSize * 2;
 
-
-constexpr double kProcessNoise = 0.001;
+constexpr double kProcessNoise = 0.0000000000001;
 
 arma::mat GetQMat() {
   arma::mat q_mat = arma::zeros(kTotalStateSize,kTotalStateSize);
@@ -76,9 +76,10 @@ arma::mat GetQMat() {
 arma::mat GetSigmaZero() {
 
   arma::mat seg_0 = arma::zeros(kTotalStateSize,kTotalStateSize);
-
+  // double large_number = std::numeric_limits<double>::max() / 10;
+  double large_number = 2e10;
   seg_0.submat(3, 3, kTotalStateSize -1 , kTotalStateSize -1) =
-      arma::eye(kMaxLandmarkSize * 2, kMaxLandmarkSize * 2) * (std::numeric_limits<double>::max() / 10);
+      arma::eye(kMaxLandmarkSize * 2, kMaxLandmarkSize * 2) * large_number;
   return seg_0;
 }
 }
@@ -126,7 +127,14 @@ public:
     // Want T_old_new = T_old_odom * T_odom_new = T_odom_old.inv() * T_odom_new
     turtlelib::Transform2D T_old_new_robot = T_odom_oldrobot.inv() * T_odom_newrobot;
 
-    RCLCPP_ERROR_STREAM(get_logger() , "\n\n=====================New Cycle");
+    static size_t iter = 0;
+    iter ++;
+
+    // if (iter == 10){
+    //   exit(0);
+    // }
+
+    RCLCPP_ERROR_STREAM(get_logger() , "\n\n=====================   New Cycle\n");
     //***************************************
     // Prediction half of SLAM
 
@@ -151,7 +159,7 @@ public:
      //***************************************
      // Measurement update half of SLAM
 
-
+    static std::array<turtlelib::Point2D,kMaxLandmarkSize> landmark_init_loc;
      for (const auto &marker : msg.markers) {
        // Note: This XY still needs a transform, it's in robot's frame,
        // But the math we use needs it in global frame's delta xy.
@@ -161,15 +169,17 @@ public:
       auto [marker_world_p, marker_index] = StripMarker(marker, current_bot_tf);
 
       RCLCPP_INFO_STREAM(get_logger(),
-                         "Processing Marker " << marker_index << " At world: " << marker_world_p);
+                         "\n---------------->   Processing Marker " << marker_index << " At world: " << marker_world_p);
 
       // Init with trusting the sensor value.
       if (! initialized_landmark[marker_index]){
         combined_states.at(3+marker_index*2) = marker_world_p.x;
-        combined_states.at(3+marker_index*2+1) = marker_world_p.x;
+        combined_states.at(3+marker_index*2+1) = marker_world_p.y;
         initialized_landmark[marker_index] = true;
         RCLCPP_INFO_STREAM(get_logger(), "Marker " << marker_index << " Init for the first time");
+        landmark_init_loc[marker_index] = marker_world_p;
       }
+
 
       // Get predict and measured marker to robot xy
       RCLCPP_ERROR_STREAM(get_logger(), "Combined state\n" << combined_states);
@@ -179,12 +189,16 @@ public:
                      current_bot_tf.translation());
       RCLCPP_ERROR_STREAM(get_logger(), "Predicted Marker delta " << predict_landmark_delta);
       auto H_j_mat = GetH_j(marker_index, predict_landmark_delta);
+      RCLCPP_ERROR_STREAM(get_logger(), "H_j \n" << H_j_mat);
 
+
+
+      RCLCPP_ERROR_STREAM(get_logger(), "H_j_mat * covariance_sigma * H_j_mat.t() + R_mat \n" << H_j_mat * covariance_sigma * H_j_mat.t() + R_mat);
+      RCLCPP_ERROR_STREAM(get_logger(), "arma::inv(H_j_mat * covariance_sigma * H_j_mat.t() + R_mat) \n" << (H_j_mat * covariance_sigma * H_j_mat.t() + R_mat).i());
       arma::mat K_j_mat = covariance_sigma * H_j_mat.t() *
-                          arma::inv(H_j_mat * covariance_sigma * H_j_mat.t() + R_mat);
+                          (H_j_mat * covariance_sigma * H_j_mat.t() + R_mat).i();
 
-      RCLCPP_ERROR_STREAM(get_logger(), "H_j " << H_j_mat);
-      RCLCPP_ERROR_STREAM(get_logger(), "K_j " << K_j_mat);
+      RCLCPP_ERROR_STREAM(get_logger(), "K_j \n" << K_j_mat);
 
       auto measured_landmark_delta = GetDeltaXY(marker_world_p, current_bot_tf.translation());
 
@@ -200,7 +214,16 @@ public:
       covariance_sigma =
           (arma::eye(kTotalStateSize, kTotalStateSize) - K_j_mat * H_j_mat) * covariance_sigma;
       RCLCPP_ERROR_STREAM(get_logger(), "covariance sigma\n " << covariance_sigma);
+      // PublishObsLocation(landmark_init_loc[marker_index], marker_index);
+      // PublishObsLocation(marker_world_p, marker_index);
+      PublishObsLocation({combined_states.at(3 + marker_index * 2),
+                          combined_states.at(3 + marker_index * 2 + 1)},
+                         marker_index, kWorldFrame);
      }
+
+    //  End of slam math
+
+
 
 
     T_odom_oldrobot = T_odom_newrobot;
@@ -209,12 +232,22 @@ public:
                                            combined_states.at(2)};
 
     PublishWorldOdomRobot(new_robot_world, T_odom_newrobot, new_odom.header.stamp);
+    
+    // static bool init_obs = false;
+    // if (init_obs){
+    // init_obs= true;
+
+    // }
+
   }
 
 
   // void Predict(turtlelib::Transform2D T_delta){
     
   // }
+
+
+  
 
 
   // This gives a delta x delta y from robot to landmark
@@ -279,15 +312,44 @@ public:
     tf_broadcaster.sendTransform(tf_stamped);
 
     geometry_msgs::msg::PoseStamped new_pose;
-    new_pose.header.frame_id = body_id;
+    new_pose.header.frame_id = kWorldFrame;
     new_pose.header.stamp = stamp;
+    new_pose.pose.position.x = T_world_robot.translation().x;
+    new_pose.pose.position.y = T_world_robot.translation().y;
+    bot_path_history.push_back(new_pose);
+    if (bot_path_history.size() >= kRobotPathHistorySize) {
+      bot_path_history.pop_front();
+    }
+
     nav_msgs::msg::Path path_msg;
     path_msg.header = new_pose.header;
-    path_msg.poses.push_back(new_pose);
-    new_pose.pose.position.x += 0.005;
-    path_msg.poses.push_back(new_pose);
+
+    path_msg.poses = std::vector<geometry_msgs::msg::PoseStamped>{bot_path_history.begin(),
+                                                                  bot_path_history.end()};
 
     path_publisher_->publish(path_msg);
+  }
+
+  void PublishObsLocation(turtlelib::Point2D loc , size_t LandmarkIndex, std::string frame_name) {
+    visualization_msgs::msg::MarkerArray msg;
+    visualization_msgs::msg::Marker mk;
+    mk.header.frame_id = frame_name;
+    mk.header.stamp = get_clock()->now();
+    mk.id = kSlamMarkerStartingID + LandmarkIndex;
+
+    RCLCPP_ERROR_STREAM(get_logger(), "Publishing loc "<< loc );
+    mk.pose.position.x = loc.x;
+    mk.pose.position.y = loc.y;
+    mk.scale.z = 0.8;
+    mk.pose.position.z = 0.8 / 2;
+    mk.color.g = 1.0;
+    mk.color.a = 0.8;
+
+    mk.type = mk.CYLINDER;
+    mk.scale.x = 0.035 * 2;
+    mk.scale.y = 0.035 * 2;
+    msg.markers.push_back(mk);
+    sensor_estimate_pub_->publish(msg);
   }
 
 private:
@@ -296,7 +358,9 @@ private:
 
   nav_msgs::msg::Odometry new_odom;
 
-  turtlelib::Transform2D guessed_robot_world;
+  std::deque<geometry_msgs::msg::PoseStamped> bot_path_history = std::deque<geometry_msgs::msg::PoseStamped>(kRobotPathHistorySize);
+
+  // turtlelib::Transform2D guessed_robot_world;
 
   // combined covariance segma_t
   arma::mat covariance_sigma;

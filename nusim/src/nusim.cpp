@@ -368,9 +368,15 @@ private:
       obstacle_marker.header.frame_id = kSimRobotBaseFrameID;
       obstacle_marker.header.stamp = get_clock()->now();
       obstacle_marker.id = kFakeSenorStartingID + (i++);
+      // RCLCPP_ERROR_STREAM(get_logger(), "Published marker " << obstacle_marker.id );
+      // RCLCPP_ERROR_STREAM(
+      //     get_logger(), " from world " << obs.pose.position.x << " " << obs.pose.position.y);
 
       auto new_loc = red_bot.GetBodyConfig().inv()(
           {turtlelib::Point2D{obs.pose.position.x, obs.pose.position.y}}); // P_center_obs
+
+      RCLCPP_ERROR_STREAM(get_logger(), " \n ++++ ++++++++++++++++++ bot_loc" << red_bot.GetBodyConfig());
+
       double range = turtlelib::Vector2D{new_loc.x, new_loc.y}.magnitude();
       if (range > max_range && max_range >= 0.0) {
         // Because of this, it's easier to merge logic for both usecase, instead
@@ -387,8 +393,10 @@ private:
       obstacle_marker.pose.position.z = 0.4 / 2;
       obstacle_marker.color.g = 1.0;
       obstacle_marker.color.a = 0.4;
+      // RCLCPP_ERROR_STREAM(get_logger(),""<<visualization_msgs::msg::to_yaml(obstacle_marker));
 
       msg.markers.push_back(obstacle_marker);
+
     }
 
     fake_sensor_publisher_->publish(msg);

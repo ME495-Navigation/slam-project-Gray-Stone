@@ -9,6 +9,8 @@ Panels:
         - /green1
         - /obstacles_real1/Topic1
         - /walls1/Topic1
+        - /green_path1
+        - /fake_sensor2
       Splitter Ratio: 0.30957943201065063
     Tree Height: 608
   - Class: rviz_common/Selection
@@ -81,6 +83,8 @@ Visualization Manager:
           Value: true
         green/imu_link:
           Value: true
+        green/odom:
+          Value: true
         green/wheel_left_link:
           Value: true
         green/wheel_right_link:
@@ -122,6 +126,19 @@ Visualization Manager:
                 blue/wheel_left_link:
                   {}
                 blue/wheel_right_link:
+                  {}
+          green/odom:
+            green/base_footprint:
+              green/base_link:
+                green/base_scan:
+                  {}
+                green/caster_back_link:
+                  {}
+                green/imu_link:
+                  {}
+                green/wheel_left_link:
+                  {}
+                green/wheel_right_link:
                   {}
           odom:
             {}
@@ -320,7 +337,7 @@ Visualization Manager:
       Enabled: true
       Name: obstacles_real
       Namespaces:
-        {}
+        "": true
       Topic:
         Depth: 5
         Durability Policy: Transient Local
@@ -332,7 +349,7 @@ Visualization Manager:
       Enabled: true
       Name: walls
       Namespaces:
-        {}
+        "": true
       Topic:
         Depth: 5
         Durability Policy: Transient Local
@@ -411,7 +428,7 @@ Visualization Manager:
     - Alpha: 1
       Buffer Length: 150
       Class: rviz_default_plugins/Path
-      Color: 1; 1; 255
+      Color: 0; 255; 0
       Enabled: true
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
@@ -439,8 +456,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 2.5000462532043457
-        Min Value: -2.500027894973755
+        Max Value: 2.500200033187866
+        Min Value: -2.500100612640381
         Value: true
       Axis: X
       Channel Name: intensity
@@ -469,6 +486,18 @@ Visualization Manager:
         Value: /nusim/laser_scan
       Use Fixed Frame: true
       Use rainbow: true
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: fake_sensor
+      Namespaces:
+        {}
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /estimate_sensor
       Value: true
   Enabled: true
   Global Options:
@@ -516,25 +545,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 3.7469892501831055
+      Distance: 1.685789942741394
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.3377644717693329
-        Y: 0.13751623034477234
-        Z: 0.3074270188808441
+        X: -0.2802542746067047
+        Y: 0.33748704195022583
+        Z: 0.3364635705947876
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.0895473957061768
+      Pitch: 1.5697963237762451
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz_default_plugins)
-      Yaw: 3.1320745944976807
+      Yaw: 3.037073850631714
     Saved: ~
 Window Geometry:
   Displays:
