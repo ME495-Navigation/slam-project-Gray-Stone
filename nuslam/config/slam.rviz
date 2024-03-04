@@ -426,7 +426,7 @@ Visualization Manager:
         Value: /blue/path
       Value: true
     - Alpha: 1
-      Buffer Length: 150
+      Buffer Length: 300
       Class: rviz_default_plugins/Path
       Color: 0; 255; 0
       Enabled: true
@@ -456,8 +456,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 2.500200033187866
-        Min Value: -2.500100612640381
+        Max Value: 2.500000238418579
+        Min Value: -2.500000238418579
         Value: true
       Axis: X
       Channel Name: intensity
@@ -491,7 +491,7 @@ Visualization Manager:
       Enabled: true
       Name: fake_sensor
       Namespaces:
-        {}
+        "": true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -545,16 +545,16 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 1.685789942741394
+      Distance: 4.764347076416016
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.2802542746067047
-        Y: 0.33748704195022583
-        Z: 0.3364635705947876
+        X: -0.1271732896566391
+        Y: 0.20254655182361603
+        Z: 0.336616575717926
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
@@ -563,7 +563,7 @@ Visualization Manager:
       Pitch: 1.5697963237762451
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz_default_plugins)
-      Yaw: 3.037073850631714
+      Yaw: 3.1420748233795166
     Saved: ~
 Window Geometry:
   Displays:

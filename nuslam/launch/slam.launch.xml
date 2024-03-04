@@ -4,7 +4,7 @@
         <arg name="robot" value="nusim"></arg>
         <arg name="use_odom" value="false"/>
         <!-- <arg name="cmd_src" value="teleop"/> -->
-        <arg name="cmd_src" value="circle"/>
+        <arg name="cmd_src" value="teleop"/>
         <arg name="use_rviz" value="false"/>
 
     </include>
