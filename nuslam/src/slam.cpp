@@ -61,8 +61,8 @@ constexpr static size_t kRobotPathHistorySize = 10; // number of data points
 constexpr size_t kMaxLandmarkSize = 3;
 constexpr size_t kTotalStateSize = 3 + kMaxLandmarkSize * 2;
 
-constexpr double kProcessNoise = 1e-9;
-constexpr double kSensorNoise = 1e-9;
+constexpr double kProcessNoise = 1e-2;
+constexpr double kSensorNoise = 1e-2;
 
 arma::mat GetQMat() {
   arma::mat q_mat = arma::zeros(kTotalStateSize, kTotalStateSize);
@@ -80,6 +80,13 @@ arma::mat GetSigmaZero() {
       arma::eye(kMaxLandmarkSize * 2, kMaxLandmarkSize * 2) * large_number;
   return seg_0;
 }
+
+std::ostream &operator<<(std::ostream &os, const std::tuple<double, double> &p) {
+  auto [x,y] = p;
+  os << "[" << x << y << "]";
+  return os;
+}
+
 } // namespace
 
 class Slam : public rclcpp::Node {
@@ -132,7 +139,7 @@ public:
         GetCurrentStateTF(combined_states) * T_old_new_robot;
     combined_states.at(0) = guessed_robot_world.translation().x;
     combined_states.at(1) = guessed_robot_world.translation().y;
-    combined_states.at(2) = guessed_robot_world.rotation();
+    combined_states.at(2) = turtlelib::normalize_angle(guessed_robot_world.rotation());
 
     auto current_bot_tf = GetCurrentStateTF(combined_states);
     // predict A matrix
@@ -150,10 +157,13 @@ public:
 
     static std::array<turtlelib::Point2D, kMaxLandmarkSize> landmark_init_loc;
     for (const auto &marker : msg.markers) {
+      // Skip not used markers
+      if (marker.action == marker.DELETE){
+        continue;
+      }
       // Note: This XY still needs a transform, it's in robot's frame,
       // But the math we use needs it in global frame's delta xy.
       // They are a rotation off.
-
       // Data formatting
       auto [marker_world_p, marker_index] = StripMarker(marker, current_bot_tf);
 
@@ -171,46 +181,52 @@ public:
 
       // Get predict and measured marker to robot xy
       RCLCPP_ERROR_STREAM(get_logger(), "Combined state\n" << combined_states);
-      turtlelib::Point2D predict_landmark_world{combined_states.at(3 + marker_index * 2),
-                                                combined_states.at(3 + marker_index * 2 + 1)};
+      turtlelib::Point2D predict_landmark_world = GetCurrentLandmarkWold(marker_index);
 
       auto predict_landmark_delta =
           GetDeltaXY(predict_landmark_world, current_bot_tf.translation());
       auto predict_landmark_polar = World2RelativePolar(predict_landmark_world, current_bot_tf);
 
-      RCLCPP_ERROR_STREAM(get_logger(), "predict_landmark_delta " << predict_landmark_delta);
-      RCLCPP_ERROR_STREAM(get_logger(),
-                          "predict_landmark_polar " << Struct2Col(predict_landmark_polar));
       auto H_j_mat = GetH_j(marker_index, predict_landmark_delta);
-      RCLCPP_ERROR_STREAM(get_logger(), "H_j \n" << H_j_mat);
-
-      RCLCPP_ERROR_STREAM(get_logger(), "H_j_mat * covariance_sigma * H_j_mat.t() + R_mat \n"
-                                            << H_j_mat * covariance_sigma * H_j_mat.t() + R_mat);
-      RCLCPP_ERROR_STREAM(get_logger(),
-                          "arma::inv(H_j_mat * covariance_sigma * H_j_mat.t() + R_mat) \n"
-                              << (H_j_mat * covariance_sigma * H_j_mat.t() + R_mat).i());
       arma::mat K_j_mat =
           covariance_sigma * H_j_mat.t() * (H_j_mat * covariance_sigma * H_j_mat.t() + R_mat).i();
 
-      RCLCPP_ERROR_STREAM(get_logger(), "K_j \n" << K_j_mat);
-
       auto measured_landmark_delta = GetDeltaXY(marker_world_p, current_bot_tf.translation());
+      
       auto measured_landmark_polar = World2RelativePolar(marker_world_p, current_bot_tf);
-      RCLCPP_ERROR_STREAM(get_logger(), "measured_landmark_delta " << measured_landmark_delta);
-      RCLCPP_ERROR_STREAM(get_logger(),
-                          "measured_landmark_polar " << Struct2Col(measured_landmark_polar));
 
-      arma::Col<double> err =
-          (Struct2Col(measured_landmark_polar)) - (Struct2Col(predict_landmark_polar));
-      err.at(1) = turtlelib::normalize_angle(err.at(1));
-      RCLCPP_ERROR_STREAM(get_logger(), "err normalized \n" << err);
+      auto [predict_range, predict_bearing] = predict_landmark_polar;
+      auto [measured_range, measured_bearing] = measured_landmark_polar;
+      arma::Col<double> err{
+          measured_range - predict_range,
+          turtlelib::normalize_angle(measured_bearing - predict_bearing)};
 
-      combined_states = combined_states + K_j_mat * (err);
-      RCLCPP_ERROR_STREAM(get_logger(), "K_j * err \n" << K_j_mat * (err));
-      RCLCPP_ERROR_STREAM(get_logger(), "Combined state\n" << combined_states);
+      arma::Col<double> correction = K_j_mat * (err);
+      // correction.at(1) = - correction.at(1);
 
+      combined_states = combined_states + correction;
+      combined_states.at(2) = turtlelib::normalize_angle(combined_states.at(2));
       covariance_sigma =
           (arma::eye(kTotalStateSize, kTotalStateSize) - K_j_mat * H_j_mat) * covariance_sigma;
+
+      RCLCPP_ERROR_STREAM(get_logger(), "H_j \n" << H_j_mat);
+      // RCLCPP_ERROR_STREAM(get_logger(), "H_j_mat * covariance_sigma * H_j_mat.t() + R_mat \n"
+      //                                       << H_j_mat * covariance_sigma * H_j_mat.t() + R_mat);
+      RCLCPP_ERROR_STREAM(get_logger(),
+                          "arma::inv(H_j_mat * covariance_sigma * H_j_mat.t() + R_mat) \n"
+                              << (H_j_mat * covariance_sigma * H_j_mat.t() + R_mat).i());
+
+      RCLCPP_ERROR_STREAM(get_logger(), "K_j \n" << K_j_mat);
+      RCLCPP_ERROR_STREAM(get_logger(), "predict_landmark_delta " << predict_landmark_delta
+                                                                  << " predict_landmark_polar "
+                                                                  << predict_landmark_polar);
+      RCLCPP_ERROR_STREAM(get_logger(), "measured_landmark_delta " << measured_landmark_delta
+                                                                   << " measured_landmark_polar "
+                                                                   << measured_landmark_polar);
+
+      RCLCPP_ERROR_STREAM(get_logger(), "err normalized \n" << err);
+      RCLCPP_ERROR_STREAM(get_logger(), "K_j * err \n" << K_j_mat * (err));
+      RCLCPP_ERROR_STREAM(get_logger(), "Combined state\n" << combined_states);
       RCLCPP_ERROR_STREAM(get_logger(), "covariance sigma\n " << covariance_sigma);
       // PublishObsLocation(landmark_init_loc[marker_index], marker_index);
       // PublishObsLocation(marker_world_p, marker_index);
@@ -236,7 +252,10 @@ public:
 
   std::tuple<double, double> World2RelativePolar(turtlelib::Point2D landmark_world_xy,
                                                  turtlelib::Transform2D bot_pose) {
-    auto [dx, dy] = GetDeltaXY(landmark_world_xy, bot_pose.translation());
+    // auto [dx, dy] = GetDeltaXY(landmark_world_xy, bot_pose.translation());
+
+    double dx = landmark_world_xy.x - bot_pose.translation().x;
+    double dy = landmark_world_xy.y - bot_pose.translation().y;
     double range = std::sqrt(dx * dx + dy * dy);
     double bearing = turtlelib::normalize_angle(atan2(dy, dx) - bot_pose.rotation());
     return {range, bearing};
@@ -248,11 +267,14 @@ public:
   //! @param landmark_robot_xy- relative location of landmark relative to robot
   arma::mat GetH_j(size_t landmark_index, turtlelib::Point2D landmark_robot_xy) {
     auto [dx, dy] = landmark_robot_xy;
-    double d = dx * dx + dy * dy;
-    double d_rt = std::sqrt(d);
-    arma::mat first({{0, -dx / d_rt, -dy / d_rt}, {-1, dy / d, -dx / d}});
+    double dis_sq = dx * dx + dy * dy;
+    double d_rt = std::sqrt(dis_sq);
 
-    arma::mat second({{dx / d_rt, dy / d_rt}, {-dy / d, dx / d}});
+    RCLCPP_ERROR_STREAM(get_logger(), "dx "<< dx << " dy " << dy << " d_sq " << dis_sq << " d_rt "<< d_rt);
+
+    arma::mat first({{0, -dx / d_rt, -dy / d_rt}, {-1, dy / dis_sq, -dx / dis_sq}});
+
+    arma::mat second({{dx / d_rt, dy / d_rt}, {-dy / dis_sq, dx / dis_sq}});
 
     return arma::join_rows(first, arma::zeros(2, 2 * (landmark_index)), second,
                            arma::zeros(2, 2 * (kMaxLandmarkSize - 1 - landmark_index)));
@@ -264,6 +286,10 @@ public:
 
   turtlelib::Transform2D GetCurrentStateTF(arma::mat current_state) {
     return {{current_state.at(0), current_state.at(1)}, current_state.at(2)};
+  }
+
+  turtlelib::Point2D GetCurrentLandmarkWold ( size_t landmark_id){
+    return {combined_states.at(3 + landmark_id * 2), combined_states.at(3 + landmark_id * 2 + 1)};
   }
 
   //! @brief return stripped marker info
