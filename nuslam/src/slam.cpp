@@ -183,23 +183,22 @@ public:
       RCLCPP_ERROR_STREAM(get_logger(), "Combined state\n" << combined_states);
       turtlelib::Point2D predict_landmark_world = GetCurrentLandmarkWold(marker_index);
 
-      auto predict_landmark_delta =
-          GetDeltaXY(predict_landmark_world, current_bot_tf.translation());
+      // auto predict_landmark_delta =
+      //     GetDeltaXY(predict_landmark_world, current_bot_tf.translation());
       auto predict_landmark_polar = World2RelativePolar(predict_landmark_world, current_bot_tf);
 
-      auto H_j_mat = GetH_j(marker_index, predict_landmark_delta);
+      auto H_j_mat = GetH_j(marker_index, predict_landmark_world, current_bot_tf);
       arma::mat K_j_mat =
           covariance_sigma * H_j_mat.t() * (H_j_mat * covariance_sigma * H_j_mat.t() + R_mat).i();
 
-      auto measured_landmark_delta = GetDeltaXY(marker_world_p, current_bot_tf.translation());
-      
+      // auto measured_landmark_delta = GetDeltaXY(marker_world_p, current_bot_tf.translation());
+
       auto measured_landmark_polar = World2RelativePolar(marker_world_p, current_bot_tf);
 
       auto [predict_range, predict_bearing] = predict_landmark_polar;
       auto [measured_range, measured_bearing] = measured_landmark_polar;
-      arma::Col<double> err{
-          measured_range - predict_range,
-          turtlelib::normalize_angle(measured_bearing - predict_bearing)};
+      arma::Col<double> err{measured_range - predict_range,
+                            turtlelib::normalize_angle(measured_bearing - predict_bearing)};
 
       arma::Col<double> correction = K_j_mat * (err);
       // correction.at(1) = - correction.at(1);
@@ -217,12 +216,8 @@ public:
                               << (H_j_mat * covariance_sigma * H_j_mat.t() + R_mat).i());
 
       RCLCPP_ERROR_STREAM(get_logger(), "K_j \n" << K_j_mat);
-      RCLCPP_ERROR_STREAM(get_logger(), "predict_landmark_delta " << predict_landmark_delta
-                                                                  << " predict_landmark_polar "
-                                                                  << predict_landmark_polar);
-      RCLCPP_ERROR_STREAM(get_logger(), "measured_landmark_delta " << measured_landmark_delta
-                                                                   << " measured_landmark_polar "
-                                                                   << measured_landmark_polar);
+      RCLCPP_ERROR_STREAM(get_logger(), " predict_landmark_polar " << predict_landmark_polar);
+      RCLCPP_ERROR_STREAM(get_logger(), " measured_landmark_polar " << measured_landmark_polar);
 
       RCLCPP_ERROR_STREAM(get_logger(), "err normalized \n" << err);
       RCLCPP_ERROR_STREAM(get_logger(), "K_j * err \n" << K_j_mat * (err));
@@ -265,8 +260,12 @@ public:
   //! @brief - Get the big H_j matrix for landmark J, given it's relative location from robot
   //! @param landmark_index - index of the landmark, zero indexed (max n-1 for n landmarks)
   //! @param landmark_robot_xy- relative location of landmark relative to robot
-  arma::mat GetH_j(size_t landmark_index, turtlelib::Point2D landmark_robot_xy) {
-    auto [dx, dy] = landmark_robot_xy;
+  arma::mat GetH_j(size_t landmark_index, turtlelib::Point2D predict_global_pose , turtlelib::Transform2D bot_pose) {
+     
+    auto [gx,gy] = predict_global_pose;
+    double dx = gx - bot_pose.translation().x;
+    double dy = gy - bot_pose.translation().y;
+
     double dis_sq = dx * dx + dy * dy;
     double d_rt = std::sqrt(dis_sq);
 
