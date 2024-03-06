@@ -10,7 +10,8 @@ Panels:
         - /obstacles_real1/Topic1
         - /walls1/Topic1
         - /green_path1
-        - /fake_sensor2
+        - /estimate_sensor1
+        - /debug_sensor1
       Splitter Ratio: 0.30957943201065063
     Tree Height: 608
   - Class: rviz_common/Selection
@@ -489,7 +490,7 @@ Visualization Manager:
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
-      Name: fake_sensor
+      Name: estimate_sensor
       Namespaces:
         "": true
       Topic:
@@ -498,6 +499,18 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /estimate_sensor
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: debug_sensor
+      Namespaces:
+        "": true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /debug_sensor
       Value: true
   Enabled: true
   Global Options:

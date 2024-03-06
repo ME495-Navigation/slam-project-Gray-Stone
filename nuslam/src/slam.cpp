@@ -47,15 +47,19 @@
 #include <leo_ros_utils/param_helper.hpp>
 
 #include <armadillo>
-
+#include <tf2/LinearMath/Quaternion.h>
 using leo_ros_utils::GetParam;
 
 namespace {
 
 // These are copied from nusim.
 const std::string kWorldFrame = "nusim/world";
-constexpr static int32_t kFakeSenorStartingID = 150;
-constexpr static int32_t kSlamMarkerStartingID = 300;
+constexpr static int32_t kFakeSenorStartingID = 50;
+constexpr static int32_t kSlamMarkerStartingID = 100;
+constexpr static int32_t kMeasureSensorPolarID = 200;
+constexpr static int32_t kPredictSensorPolarID = 230;
+constexpr static int32_t kActualSensorPolarID = 260;
+
 constexpr static size_t kRobotPathHistorySize = 10; // number of data points
 
 constexpr size_t kMaxLandmarkSize = 3;
@@ -106,6 +110,8 @@ public:
     path_publisher_ = create_publisher<nav_msgs::msg::Path>("green/path", 10);
     sensor_estimate_pub_ =
         create_publisher<visualization_msgs::msg::MarkerArray>("estimate_sensor", 10);
+    debug_sensor_pub_ =
+        create_publisher<visualization_msgs::msg::MarkerArray>("debug_sensor", 10);
 
     // Listen to odom
 
@@ -186,6 +192,7 @@ public:
       // auto predict_landmark_delta =
       //     GetDeltaXY(predict_landmark_world, current_bot_tf.translation());
       auto predict_landmark_polar = World2RelativePolar(predict_landmark_world, current_bot_tf);
+      PublishArrow(predict_landmark_polar, marker_index, kPredictSensorPolarID);
 
       auto H_j_mat = GetH_j(marker_index, predict_landmark_world, current_bot_tf);
       arma::mat K_j_mat =
@@ -194,7 +201,9 @@ public:
       // auto measured_landmark_delta = GetDeltaXY(marker_world_p, current_bot_tf.translation());
 
       auto measured_landmark_polar = World2RelativePolar(marker_world_p, current_bot_tf);
-
+      PublishArrow(measured_landmark_polar  , marker_index , kMeasureSensorPolarID);
+      PublishArrow(measured_landmark_polar, marker_index, kActualSensorPolarID,
+                   marker.header.frame_id);
       auto [predict_range, predict_bearing] = predict_landmark_polar;
       auto [measured_range, measured_bearing] = measured_landmark_polar;
       arma::Col<double> err{measured_range - predict_range,
@@ -229,6 +238,7 @@ public:
           {combined_states.at(3 + marker_index * 2), combined_states.at(3 + marker_index * 2 + 1)},
           marker_index, kWorldFrame);
     }
+    PublishPredictTF(current_bot_tf);
 
     //  End of slam math
 
@@ -247,8 +257,6 @@ public:
 
   std::tuple<double, double> World2RelativePolar(turtlelib::Point2D landmark_world_xy,
                                                  turtlelib::Transform2D bot_pose) {
-    // auto [dx, dy] = GetDeltaXY(landmark_world_xy, bot_pose.translation());
-
     double dx = landmark_world_xy.x - bot_pose.translation().x;
     double dy = landmark_world_xy.y - bot_pose.translation().y;
     double range = std::sqrt(dx * dx + dy * dy);
@@ -362,6 +370,66 @@ public:
     sensor_estimate_pub_->publish(msg);
   }
 
+  void PublishPredictTF(turtlelib::Transform2D T_world_robot_predict){
+        geometry_msgs::msg::TransformStamped tf_stamped;
+    tf_stamped.header.frame_id = kWorldFrame;
+    tf_stamped.child_frame_id = "green/base_predict";
+    tf_stamped.header.stamp = get_clock()->now();
+    tf_stamped.transform = leo_ros_utils::Convert(leo_ros_utils::Convert(T_world_robot_predict));
+    tf_broadcaster.sendTransform(tf_stamped);
+
+  }
+
+  void PublishArrow(std::tuple<double, double> range_bearing,
+                    size_t marker_id, size_t starting_id , std::string frame_id = "green/base_predict") {
+
+
+    auto [range, bearing] = range_bearing;
+    visualization_msgs::msg::MarkerArray msg;
+    visualization_msgs::msg::Marker arr;
+    arr.type = arr.ARROW;
+    arr.header.stamp = get_clock()->now();
+    arr.header.frame_id = frame_id;
+    arr.id = starting_id + marker_id;
+    // Position/Orientation
+    // Pivot point is around the tip of its tail. Identity orientation points it along the +X axis.
+    // scale.x is the arrow length, scale.y is the arrow width and scale.z is the arrow height.
+
+    tf2::Quaternion target_q;
+    // Here is the magic, the description of setEuler is mis-leading!
+    target_q.setRPY(0.0, 0.0, bearing);
+    // Example of a little angle down, Use this for toggle switch.
+    // target_q.setRPY(0.0, angle_down, z_angle);
+
+    arr.pose.orientation.w = target_q.w();
+    arr.pose.orientation.x = target_q.x();
+    arr.pose.orientation.y = target_q.y();
+    arr.pose.orientation.z = target_q.z();
+    arr.scale.x = range;
+
+    const double base_thickness = 0.02;
+    arr.scale.y = base_thickness;
+    arr.scale.z = base_thickness;
+    arr.color.a = 0.8;
+    arr.color.g = 0.8;
+    if (starting_id == kMeasureSensorPolarID) {
+      arr.scale.z = base_thickness * 3;
+      arr.color.r = 0.8;
+    }
+    if (starting_id == kPredictSensorPolarID) {
+      arr.scale.y = base_thickness * 3;
+      arr.color.b = 0.8;
+    }
+    if(starting_id == kActualSensorPolarID){
+    arr.color.g = 0.0;
+    arr.color.r = 1.0;
+
+
+    }
+    msg.markers.push_back(arr);
+    debug_sensor_pub_->publish(msg);
+  }
+
 private:
   std::string body_id;
   std::string odom_id;
@@ -384,6 +452,7 @@ private:
 
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_publisher_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr sensor_estimate_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr debug_sensor_pub_;
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;

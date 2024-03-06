@@ -29,7 +29,7 @@
     <!-- As well as green track -->
     <node pkg="nuslam" exec="slam" name="slam" output="screen">
         <param from="$(find-pkg-share nuturtle_description)/config/diff_params.yaml" />
-        <param name="body_id" value="/green/base_footprint"/>
+        <param name="body_id" value="green/base_footprint"/>
         <param name="odom_id" value="/green/odom"/>
     </node>
 
