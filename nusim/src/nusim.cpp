@@ -277,7 +277,7 @@ private:
     std_msgs::msg::UInt64 time_step_msg;
     time_step_msg.data = ++time_step_;
     time_step_publisher_->publish(time_step_msg);
-
+    auto current_stamp = get_clock()->now();
     std::stringstream debug_ss;
     debug_ss << "\n===>\n";
 
@@ -333,19 +333,20 @@ private:
     nuturtlebot_msgs::msg::SensorData red_sensor_msg;
     red_sensor_msg.left_encoder = encoder_ticks_per_rad * new_wheel_config.left;
     red_sensor_msg.right_encoder = encoder_ticks_per_rad * new_wheel_config.right;
-    red_sensor_msg.stamp = get_clock()->now();
+    red_sensor_msg.stamp = current_stamp;
     red_sensor_publisher_->publish(red_sensor_msg);
     debug_ss << "encoder sensor value" << nuturtlebot_msgs::msg::to_yaml(red_sensor_msg, true);
 
     // Publish TF for red robot
-    auto tf = Gen2DTransform(red_bot.GetBodyConfig(), kWorldFrame, kSimRobotBaseFrameID);
+    auto tf =
+        Gen2DTransform(red_bot.GetBodyConfig(), kWorldFrame, kSimRobotBaseFrameID, current_stamp);
     tf_broadcaster_->sendTransform(tf);
-
+    latest_bot_tf = tf;
     // Publish the robot track path.
     geometry_msgs::msg::PoseStamped new_pose;
     new_pose.pose = leo_ros_utils::Convert(red_bot.GetBodyConfig());
     new_pose.header.frame_id = kWorldFrame;
-    new_pose.header.stamp = get_clock()->now();
+    new_pose.header.stamp = current_stamp;
 
     bot_path_history.push_back(new_pose);
     if (bot_path_history.size() >= kRobotPathHistorySize) {
@@ -366,7 +367,7 @@ private:
     for (const auto &obs : static_obstacles) {
       auto obstacle_marker = obs;
       obstacle_marker.header.frame_id = kSimRobotBaseFrameID;
-      obstacle_marker.header.stamp = get_clock()->now();
+      obstacle_marker.header.stamp = latest_bot_tf.header.stamp;
       obstacle_marker.id = kFakeSenorStartingID + (i++);
       // RCLCPP_ERROR_STREAM(get_logger(), "Published marker " << obstacle_marker.id );
       // RCLCPP_ERROR_STREAM(
@@ -407,7 +408,7 @@ private:
 
     // TODO check if we need to emit laser scan from tip of robot
     laser_msg.header.frame_id = kSimRobotBaseFrameID;
-    laser_msg.header.stamp = get_clock()->now();
+    laser_msg.header.stamp = latest_bot_tf.header.stamp;
 
     laser_msg.angle_min = 0;
     laser_msg.angle_increment = sim_laser_param.angle_increment;
@@ -780,7 +781,7 @@ private:
   std::atomic<uint64_t> time_step_ = 0;
   nuturtlebot_msgs::msg::WheelCommands latest_wheel_cmd;
   std::deque<geometry_msgs::msg::PoseStamped> bot_path_history = std::deque<geometry_msgs::msg::PoseStamped>(kRobotPathHistorySize);
-  
+  geometry_msgs::msg::TransformStamped latest_bot_tf ; 
 
   // Ros objects
   rclcpp::TimerBase::SharedPtr main_timer_;
