@@ -100,7 +100,7 @@ public:
       : Node("odometry"),
         body_id(GetParam<std::string>(*this, "body_id", "name of the body frame")),
         odom_id(GetParam<std::string>(*this, "odom_id", "name of the body frame")),
-        time_odom_buffer_({{get_clock()->now(), turtlelib::Transform2D{}}} ), covariance_sigma(GetSigmaZero()),
+        time_bot_loc_buffer_({{get_clock()->now(), turtlelib::Transform2D{}}} ), covariance_sigma(GetSigmaZero()),
         combined_states(arma::zeros(3 + kMaxLandmarkSize * 2, 1)),
         // We do pre sensor update, so R_mat is only 2x2
         R_mat(arma::eye(2, 2) * kSensorNoise), initialized_landmark(kMaxLandmarkSize, false),
@@ -128,13 +128,16 @@ public:
 
   void OdomCb(const nav_msgs::msg::Odometry &new_odom) { 
     
-    
-    auto [_ , T_odom_oldrobot] = time_odom_buffer_.back();
+    //***************************************
+    // Prediction half of SLAM
+
+    // Predict state
+
     // Static last_used_odom,
     // update slam's robot pose guess with the delta in odom (odom is accurate with delta)
     turtlelib::Transform2D T_odom_newrobot = leo_ros_utils::ConvertBack(new_odom.pose.pose);
     // Want T_old_new = T_old_odom * T_odom_new = T_odom_old.inv() * T_odom_new
-    turtlelib::Transform2D T_old_new_robot = T_odom_oldrobot.inv() * T_odom_newrobot;
+    turtlelib::Transform2D T_old_new_robot = T_odom_oldrobot_.inv() * T_odom_newrobot;
     turtlelib::Transform2D guessed_robot_world = GetCurrentStateTF() * T_old_new_robot;
     SetCurrentStateTF(guessed_robot_world);
 
@@ -146,35 +149,42 @@ public:
     covariance_sigma = a_mat * covariance_sigma * a_mat.t() + GetQMat();
 
     RCLCPP_ERROR_STREAM(get_logger(), "predicted bot tf\n " << GetCurrentStateTF());
-    RCLCPP_ERROR_STREAM(get_logger(), "a_mat\n " << a_mat);
-    RCLCPP_ERROR_STREAM(get_logger(), "covariance sigma\n " << covariance_sigma);
-    T_odom_oldrobot = T_odom_newrobot;
-    PublishWorldOdomRobot(GetCurrentStateTF(), T_odom_newrobot, new_odom.header.stamp);
+    // RCLCPP_ERROR_STREAM(get_logger(), "a_mat\n " << a_mat);
+    // RCLCPP_ERROR_STREAM(get_logger(), "covariance sigma\n " << covariance_sigma);
+    T_odom_oldrobot_ = T_odom_newrobot;
 
-    if (time_odom_buffer_.size() >= kOdomBufferSize){
-      time_odom_buffer_.pop_front();
+    if (time_bot_loc_buffer_.size() >= kOdomBufferSize){
+      time_bot_loc_buffer_.pop_front();
     }
-    time_odom_buffer_.push_back({new_odom.header.stamp , T_odom_newrobot });
+    time_bot_loc_buffer_.push_back({new_odom.header.stamp , GetCurrentStateTF() });
+    PublishOdomRobot(T_odom_newrobot, new_odom.header.stamp);
+    SensorProcess();
+    PublishPath(GetCurrentStateTF() , new_odom.header.stamp);
+
   }
 
   void SensorCb(const visualization_msgs::msg::MarkerArray &msg) {
+    for (const auto &marker : msg.markers) {
+      sensor_msg_buffer_.push_back(marker);
+    }
+  }
 
+  void SensorProcess(){
   
-    RCLCPP_ERROR_STREAM(get_logger(), "\n\n=====================   New Cycle\n");
-    //***************************************
-    // Prediction half of SLAM
-
-    // Predict state
 
     auto current_bot_tf = GetCurrentStateTF();
     //***************************************
     // Measurement update half of SLAM
     visualization_msgs::msg::MarkerArray arrow_msgs;
+    while(!sensor_msg_buffer_.empty()){
 
-    static std::array<turtlelib::Point2D, kMaxLandmarkSize> landmark_init_loc;
-    for (const auto &marker : msg.markers) {
+      // We made a copy here specifically to allow popping it later.
+      const auto marker = sensor_msg_buffer_.front();
+
+      
       // Skip not used markers
       if (marker.action == marker.DELETE) {
+        sensor_msg_buffer_.pop_front();
         continue;
       }
       // Data formatting
@@ -182,15 +192,16 @@ public:
       // We want to find the closest odom to marker time stamp 
       
       // If sensor time is newer then our newest odom time
-      while (rclcpp::Time(marker.header.stamp) - time_odom_buffer_.back().first >  rclcpp::Duration(0,0)  ){
-        RCLCPP_ERROR_STREAM(get_logger(), "Sensor message is in the future of odom! Sensor: "
-                                              << std::setw(24) << std::fixed
-                                              << rclcpp::Time(marker.header.stamp).seconds()
-                                              << " Last odom time: " << std::setw(24) << std::fixed
-                                              << time_odom_buffer_.back().first.seconds());
+      auto sensor_stamp = marker.header.stamp;
+      auto maybe_matching_tf = WorldBotTFLoopUp( sensor_stamp );
+      if (! maybe_matching_tf.has_value()){
+        RCLCPP_ERROR(get_logger(),  "defer sensor process to next cycle");
+        break;
       }
+      // Pop doesn't actually return things
+      sensor_msg_buffer_.pop_front();
 
-      auto [marker_world_p, marker_index] = StripMarker(marker, FindBestOdom( marker.header.stamp ));
+      auto [marker_world_p, marker_index] = StripMarker(marker, maybe_matching_tf.value());
 
       RCLCPP_INFO_STREAM(get_logger(), "\n---------------->   Processing Marker "
                                            << marker_index << " At world: " << marker_world_p);
@@ -201,7 +212,6 @@ public:
         combined_states.at(3 + marker_index * 2 + 1) = marker_world_p.y + 1e-2;
         initialized_landmark[marker_index] = true;
         RCLCPP_INFO_STREAM(get_logger(), "Marker " << marker_index << " Init for the first time");
-        landmark_init_loc[marker_index] = marker_world_p;
       }
 
       // Get predict and measured marker to robot xy
@@ -210,7 +220,7 @@ public:
 
       auto predict_landmark_polar = World2RelativePolar(predict_landmark_world, current_bot_tf);
       arrow_msgs.markers.push_back(
-          MakeArrowMarker(predict_landmark_polar, marker_index, kPredictSensorPolarID));
+          MakeArrowMarker(predict_landmark_polar, marker_index, kPredictSensorPolarID, sensor_stamp));
 
       auto H_j_mat = GetH_j(marker_index, predict_landmark_world, current_bot_tf);
       arma::mat K_j_mat =
@@ -219,9 +229,9 @@ public:
 
       auto measured_landmark_polar = World2RelativePolar(marker_world_p, current_bot_tf);
       arrow_msgs.markers.push_back(
-          MakeArrowMarker(measured_landmark_polar, marker_index, kMeasureSensorPolarID));
+          MakeArrowMarker(measured_landmark_polar, marker_index, kMeasureSensorPolarID, sensor_stamp));
       arrow_msgs.markers.push_back(MakeArrowMarker(measured_landmark_polar, marker_index,
-                                                   kActualSensorPolarID, marker.header.frame_id));
+                                                   kActualSensorPolarID, sensor_stamp, marker.header.frame_id));
       auto [predict_range, predict_bearing] = predict_landmark_polar;
       auto [measured_range, measured_bearing] = measured_landmark_polar;
       arma::Col<double> err{measured_range - predict_range,
@@ -235,8 +245,6 @@ public:
           (arma::eye(kTotalStateSize, kTotalStateSize) - K_j_mat * H_j_mat) * covariance_sigma;
 
       RCLCPP_ERROR_STREAM(get_logger(), "H_j \n" << H_j_mat);
-      // RCLCPP_ERROR_STREAM(get_logger(), "H_j_mat * covariance_sigma * H_j_mat.t() + R_mat \n"
-      //                                       << H_j_mat * covariance_sigma * H_j_mat.t() + R_mat);
       RCLCPP_ERROR_STREAM(get_logger(), "R_mat \n" << R_mat);
       RCLCPP_ERROR_STREAM(get_logger(),
                           "arma::inv(H_j_mat * covariance_sigma * H_j_mat.t() + R_mat) \n"
@@ -253,17 +261,13 @@ public:
       PublishObsLocation(
           {combined_states.at(3 + marker_index * 2), combined_states.at(3 + marker_index * 2 + 1)},
           marker_index, kWorldFrame);
+      debug_sensor_pub_->publish(arrow_msgs);
+      //  End of slam math
+      auto T_world_odom = GetCurrentStateTF() * (T_odom_oldrobot_.inv());
+      PublishWorldOdom(T_world_odom, sensor_stamp);
     }
     PublishPredictTF(current_bot_tf);
 
-    debug_sensor_pub_->publish(arrow_msgs);
-    //  End of slam math
-    PublishWorldOdomRobot(GetCurrentStateTF(), time_odom_buffer_.back().second, time_odom_buffer_.back().first);
-  }
-  // This gives a delta x delta y from robot to landmark
-  turtlelib::Point2D GetDeltaXY(turtlelib::Point2D landmark_world_xy, turtlelib::Vector2D bot_xy) {
-    auto [landmark_x, landmark_y] = landmark_world_xy;
-    return {landmark_x - bot_xy.x, landmark_y - bot_xy.y};
   }
 
   std::tuple<double, double> World2RelativePolar(turtlelib::Point2D landmark_world_xy,
@@ -316,28 +320,37 @@ public:
     return {combined_states.at(3 + landmark_id * 2), combined_states.at(3 + landmark_id * 2 + 1)};
   }
 
-  turtlelib::Transform2D FindBestOdom(rclcpp::Time target_time) {
+  std::optional<turtlelib::Transform2D> WorldBotTFLoopUp(rclcpp::Time target_time) {
+
     RCLCPP_ERROR_STREAM(get_logger(), "Finding best time! to " << std::setw(24) << std::fixed<< target_time.seconds());
+
+    if (target_time > time_bot_loc_buffer_.back().first) {
+      RCLCPP_ERROR_STREAM(get_logger(), "Sensor message is in the future of states! Latest bot state "
+                                            << std::setw(24) << std::fixed
+                                            << time_bot_loc_buffer_.back().first.seconds());
+      return std::nullopt;
+    }
+
     // We do calculation in chrono because it have abs function.
     std::chrono::nanoseconds min_diff_abs = std::chrono::nanoseconds::max();
-    turtlelib::Transform2D best_tf = time_odom_buffer_.back().second;
+    turtlelib::Transform2D best_tf = time_bot_loc_buffer_.back().second;
 
-    for (auto riter = time_odom_buffer_.rbegin(); riter != time_odom_buffer_.rend(); ++riter) {
-      auto [odom_time, T_ob] = *riter;
+    for (auto riter = time_bot_loc_buffer_.rbegin(); riter != time_bot_loc_buffer_.rend(); ++riter) {
+      auto [odom_time, T_wb] = *riter;
       
       auto diff = target_time - odom_time;
       auto diff_abs =
           std::chrono::abs((diff).to_chrono<std::chrono::nanoseconds>());
       RCLCPP_ERROR_STREAM(get_logger(),
-                          "Time " <<  std::setw(24) << std::fixed<< odom_time.seconds() << " diff " << diff_abs.count());
+                          "Time " <<  std::setw(24) << std::fixed<< odom_time.seconds() << " diff " << diff_abs.count() <<" TF "<<T_wb);
       if (diff_abs < min_diff_abs) {
         min_diff_abs = diff_abs;
-        best_tf = T_ob;
+        best_tf = T_wb;
       } else {
-        // break;
-        RCLCPP_ERROR(get_logger(), "Should have BREAK!");
+        break;
       }
     }
+    RCLCPP_ERROR_STREAM(get_logger(),"Best tf: "<< best_tf);
     return best_tf;
   }
 
@@ -354,28 +367,31 @@ public:
     return arma::Col<double>{x, y};
   }
 
-  void PublishWorldOdomRobot(turtlelib::Transform2D T_world_robot,
-                             turtlelib::Transform2D T_odom_robot,
-                             builtin_interfaces::msg::Time stamp) {
-    auto T_world_odom = T_world_robot * (T_odom_robot.inv());
-
+  void PublishOdomRobot(turtlelib::Transform2D T_odom_robot, builtin_interfaces::msg::Time stamp) {
     geometry_msgs::msg::TransformStamped tf_stamped;
     tf_stamped.header.frame_id = odom_id;
     tf_stamped.child_frame_id = body_id;
     tf_stamped.header.stamp = stamp;
     tf_stamped.transform = leo_ros_utils::Convert(leo_ros_utils::Convert(T_odom_robot));
     tf_broadcaster.sendTransform(tf_stamped);
+  }
 
+  void PublishWorldOdom(turtlelib::Transform2D T_world_odom, builtin_interfaces::msg::Time stamp) {
+
+    geometry_msgs::msg::TransformStamped tf_stamped;
     tf_stamped.header.frame_id = kWorldFrame;
     tf_stamped.child_frame_id = odom_id;
+    tf_stamped.header.stamp = stamp;
     tf_stamped.transform = leo_ros_utils::Convert(leo_ros_utils::Convert(T_world_odom));
     tf_broadcaster.sendTransform(tf_stamped);
+  }
 
-    geometry_msgs::msg::PoseStamped new_pose;
+  void PublishPath(turtlelib::Transform2D bot_loc , builtin_interfaces::msg::Time stamp){
+        geometry_msgs::msg::PoseStamped new_pose;
     new_pose.header.frame_id = kWorldFrame;
     new_pose.header.stamp = stamp;
-    new_pose.pose.position.x = T_world_robot.translation().x;
-    new_pose.pose.position.y = T_world_robot.translation().y;
+    new_pose.pose.position.x = bot_loc.translation().x;
+    new_pose.pose.position.y = bot_loc.translation().y;
     bot_path_history_.push_back(new_pose);
     if (bot_path_history_.size() >= kRobotPathHistorySize) {
       bot_path_history_.pop_front();
@@ -388,6 +404,7 @@ public:
                                                                   bot_path_history_.end()};
 
     path_publisher_->publish(path_msg);
+
   }
 
   void PublishObsLocation(turtlelib::Point2D loc, size_t LandmarkIndex, std::string frame_name) {
@@ -422,13 +439,13 @@ public:
   }
 
   visualization_msgs::msg::Marker MakeArrowMarker(std::tuple<double, double> range_bearing,
-                                                  size_t marker_id, size_t starting_id,
+                                                  size_t marker_id, size_t starting_id,builtin_interfaces::msg::Time stamp,
                                                   std::string frame_id = "green/base_predict") {
 
     auto [range, bearing] = range_bearing;
     visualization_msgs::msg::Marker arr;
     arr.type = arr.ARROW;
-    arr.header.stamp = get_clock()->now();
+    arr.header.stamp = stamp;
     arr.header.frame_id = frame_id;
     arr.id = starting_id + marker_id;
     // Position/Orientation
@@ -475,7 +492,11 @@ private:
       std::deque<geometry_msgs::msg::PoseStamped>(kRobotPathHistorySize);
       // Don't init this, It will fill the rclcpp::Time with default constructed onces, which is different time source 
       // then what message gives.
-  std::deque<std::pair<rclcpp::Time , turtlelib::Transform2D>> time_odom_buffer_ ; 
+  
+  turtlelib::Transform2D T_odom_oldrobot_ ;
+
+  std::deque<std::pair<rclcpp::Time , turtlelib::Transform2D>> time_bot_loc_buffer_ ; 
+  std::deque<visualization_msgs::msg::Marker> sensor_msg_buffer_ ; 
   // combined covariance segma_t
   arma::mat covariance_sigma;
   arma::mat combined_states;

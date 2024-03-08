@@ -376,8 +376,6 @@ private:
       auto new_loc = red_bot.GetBodyConfig().inv()(
           {turtlelib::Point2D{obs.pose.position.x, obs.pose.position.y}}); // P_center_obs
 
-      RCLCPP_ERROR_STREAM(get_logger(), " \n ++++ ++++++++++++++++++ bot_loc" << red_bot.GetBodyConfig());
-
       double range = turtlelib::Vector2D{new_loc.x, new_loc.y}.magnitude();
       if (range > max_range && max_range >= 0.0) {
         // Because of this, it's easier to merge logic for both usecase, instead
