@@ -107,8 +107,8 @@ public:
         tf_broadcaster(*this) {
     // Uncomment this to turn on debug level and enable debug statements
     // rcutils_logging_set_logger_level(get_logger().get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
-    combined_states.at(0) = 0.1;
-    combined_states.at(1) = 0.1;
+    combined_states.at(0) = 0.0;
+    combined_states.at(1) = 0.0;
     path_publisher_ = create_publisher<nav_msgs::msg::Path>("green/path", 10);
     sensor_estimate_pub_ =
         create_publisher<visualization_msgs::msg::MarkerArray>("estimate_sensor", 10);
