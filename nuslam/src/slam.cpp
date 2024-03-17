@@ -148,9 +148,6 @@ public:
 
     covariance_sigma = a_mat * covariance_sigma * a_mat.t() + GetQMat();
 
-    RCLCPP_ERROR_STREAM(get_logger(), "predicted bot tf\n " << GetCurrentStateTF());
-    // RCLCPP_ERROR_STREAM(get_logger(), "a_mat\n " << a_mat);
-    // RCLCPP_ERROR_STREAM(get_logger(), "covariance sigma\n " << covariance_sigma);
     T_odom_oldrobot_ = T_odom_newrobot;
 
     if (time_bot_loc_buffer_.size() >= kOdomBufferSize){
@@ -195,7 +192,7 @@ public:
       auto sensor_stamp = marker.header.stamp;
       auto maybe_matching_tf = WorldBotTFLoopUp( sensor_stamp );
       if (! maybe_matching_tf.has_value()){
-        RCLCPP_ERROR(get_logger(),  "defer sensor process to next cycle");
+        RCLCPP_DEBUG(get_logger(),  "defer sensor process to next cycle");
         break;
       }
       // Pop doesn't actually return things
@@ -203,7 +200,7 @@ public:
 
       auto [marker_world_p, marker_index] = StripMarker(marker, maybe_matching_tf.value());
 
-      RCLCPP_INFO_STREAM(get_logger(), "\n---------------->   Processing Marker "
+      RCLCPP_DEBUG_STREAM(get_logger(), "\n---------------->   Processing Marker "
                                            << marker_index << " At world: " << marker_world_p);
 
       // Init with trusting the sensor value.
@@ -215,7 +212,7 @@ public:
       }
 
       // Get predict and measured marker to robot xy
-      RCLCPP_ERROR_STREAM(get_logger(), "Combined state\n" << combined_states);
+      RCLCPP_DEBUG_STREAM(get_logger(), "Combined state\n" << combined_states);
       turtlelib::Point2D predict_landmark_world = GetCurrentLandmarkWold(marker_index);
 
       auto predict_landmark_polar = World2RelativePolar(predict_landmark_world, current_bot_tf);
@@ -244,20 +241,20 @@ public:
       covariance_sigma =
           (arma::eye(kTotalStateSize, kTotalStateSize) - K_j_mat * H_j_mat) * covariance_sigma;
 
-      RCLCPP_ERROR_STREAM(get_logger(), "H_j \n" << H_j_mat);
-      RCLCPP_ERROR_STREAM(get_logger(), "R_mat \n" << R_mat);
-      RCLCPP_ERROR_STREAM(get_logger(),
+      RCLCPP_DEBUG_STREAM(get_logger(), "H_j \n" << H_j_mat);
+      RCLCPP_DEBUG_STREAM(get_logger(), "R_mat \n" << R_mat);
+      RCLCPP_DEBUG_STREAM(get_logger(),
                           "arma::inv(H_j_mat * covariance_sigma * H_j_mat.t() + R_mat) \n"
                               << (H_j_mat * covariance_sigma * H_j_mat.t() + R_mat).i());
 
-      RCLCPP_ERROR_STREAM(get_logger(), "\e[0;31m K_j \n" << K_j_mat << " \e[0m");
-      RCLCPP_ERROR_STREAM(get_logger(), " predict_landmark_polar " << predict_landmark_polar);
-      RCLCPP_ERROR_STREAM(get_logger(), " measured_landmark_polar " << measured_landmark_polar);
+      RCLCPP_DEBUG_STREAM(get_logger(), " K_j \n" << K_j_mat);
+      RCLCPP_DEBUG_STREAM(get_logger(), " predict_landmark_polar " << predict_landmark_polar);
+      RCLCPP_DEBUG_STREAM(get_logger(), " measured_landmark_polar " << measured_landmark_polar);
 
-      RCLCPP_ERROR_STREAM(get_logger(), "err normalized \n" << err);
-      RCLCPP_ERROR_STREAM(get_logger(), "K_j * err transpose \n" << (K_j_mat * (err)).t());
-      RCLCPP_ERROR_STREAM(get_logger(), "Combined state transposed \n" << combined_states.t());
-      RCLCPP_ERROR_STREAM(get_logger(), "covariance sigma\n " << covariance_sigma);
+      RCLCPP_DEBUG_STREAM(get_logger(), "err normalized \n" << err);
+      RCLCPP_DEBUG_STREAM(get_logger(), "K_j * err transpose \n" << (K_j_mat * (err)).t());
+      RCLCPP_DEBUG_STREAM(get_logger(), "Combined state transposed \n" << combined_states.t());
+      RCLCPP_DEBUG_STREAM(get_logger(), "covariance sigma\n " << covariance_sigma);
       PublishObsLocation(
           {combined_states.at(3 + marker_index * 2), combined_states.at(3 + marker_index * 2 + 1)},
           marker_index, kWorldFrame);
@@ -292,7 +289,7 @@ public:
     double d = dx * dx + dy * dy;
     double d_rt = std::sqrt(d);
 
-    RCLCPP_ERROR_STREAM(get_logger(),
+    RCLCPP_DEBUG_STREAM(get_logger(),
                         "dx " << dx << " dy " << dy << " d_sq " << d << " d_rt " << d_rt);
 
     arma::mat first({{0, -dx / d_rt, -dy / d_rt}, {-1, dy / d, -dx / d}});
@@ -320,12 +317,15 @@ public:
     return {combined_states.at(3 + landmark_id * 2), combined_states.at(3 + landmark_id * 2 + 1)};
   }
 
+  //! @brief Look up the World-Bot TF history that's closest to target time.
+  //! This assume the TF history is ordered by time.
+  //! @param - target_time: the time we want the cloest TF to be
+  //! @return - optional transform. If the target time is in future then newest
+  //! TF, we refuse the look up
   std::optional<turtlelib::Transform2D> WorldBotTFLoopUp(rclcpp::Time target_time) {
 
-    RCLCPP_ERROR_STREAM(get_logger(), "Finding best time! to " << std::setw(24) << std::fixed<< target_time.seconds());
-
     if (target_time > time_bot_loc_buffer_.back().first) {
-      RCLCPP_ERROR_STREAM(get_logger(), "Sensor message is in the future of states! Latest bot state "
+      RCLCPP_DEBUG_STREAM(get_logger(), "Sensor message is in the future of states! Latest bot state "
                                             << std::setw(24) << std::fixed
                                             << time_bot_loc_buffer_.back().first.seconds());
       return std::nullopt;
@@ -341,7 +341,7 @@ public:
       auto diff = target_time - odom_time;
       auto diff_abs =
           std::chrono::abs((diff).to_chrono<std::chrono::nanoseconds>());
-      RCLCPP_ERROR_STREAM(get_logger(),
+      RCLCPP_DEBUG_STREAM(get_logger(),
                           "Time " <<  std::setw(24) << std::fixed<< odom_time.seconds() << " diff " << diff_abs.count() <<" TF "<<T_wb);
       if (diff_abs < min_diff_abs) {
         min_diff_abs = diff_abs;
@@ -350,7 +350,7 @@ public:
         break;
       }
     }
-    RCLCPP_ERROR_STREAM(get_logger(),"Best tf: "<< best_tf);
+    RCLCPP_DEBUG_STREAM(get_logger(),"Best tf: "<< best_tf);
     return best_tf;
   }
 
@@ -414,7 +414,7 @@ public:
     mk.header.stamp = get_clock()->now();
     mk.id = kSlamMarkerStartingID + LandmarkIndex;
 
-    RCLCPP_ERROR_STREAM(get_logger(), "Publishing loc " << loc);
+    RCLCPP_DEBUG_STREAM(get_logger(), "Publishing loc " << loc);
     mk.pose.position.x = loc.x;
     mk.pose.position.y = loc.y;
     mk.scale.z = 0.8;
